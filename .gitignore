@@ -1,0 +1,5 @@
+/target
+/roms
+.idea/
+.vscode/
+.env
