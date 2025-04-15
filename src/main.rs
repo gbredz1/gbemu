@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::builder().format_timestamp_nanos().init();
 
     let mut system = Machine::default();
-    system.bus.load_cartridge("roms/Tetris (World) (Rev 1).gb")?;
+    system.bus.load_cartridge("roms/Tetris (World) (Rev A).gb")?;
 
     loop {
         system.cycle()?;

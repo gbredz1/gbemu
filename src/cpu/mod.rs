@@ -3,13 +3,14 @@ mod cpu_bus;
 
 pub(crate) use crate::cpu::cpu_bus::CpuBus;
 use log::debug;
-use std::error::Error;
 mod decoder;
 mod instruction;
 
+#[cfg(test)]
+mod decoder_test;
+mod display;
+
 use crate::cpu::decoder::LR35902Decoder;
-use crate::cpu::instruction::Instruction;
-use crate::cpu::instruction::Instruction::JP;
 
 pub struct CPU {
     decoder: LR35902Decoder,
@@ -55,10 +56,7 @@ impl CPU {
         debug!("opcode: ${:02x}", opcode);
         let instruction = self.decoder.decode(opcode);
         debug!("instruction: {:?}", instruction);
-        if let Some(instruction) = instruction {
-
-
-
+        if let Some(_) = instruction {
             Ok(())
         } else {
             Err(format!("Opcode 0x{:02x} unknow", opcode))

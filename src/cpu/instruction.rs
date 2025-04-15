@@ -1,61 +1,73 @@
-use crate::cpu::addressing_mode::{AddMod, CC};
+use crate::cpu::addressing_mode::{CC, Op};
 
 #[derive(Debug, PartialEq)]
-pub enum Instruction {
-    // Arithmetic and Logic Instructions
-    ADC(AddMod, AddMod), // 8-bit
-    ADD(AddMod, AddMod), // 8-bit & 16-bit
-    AND(AddMod),         // 8-bit
-    CP(AddMod),          // 8-bit
-    DEC(AddMod),         // 8-bit & 16-bit
-    INC(AddMod),         // 8-bit & 16-bit
-    OR(AddMod),          // 8-bit
-    SBC(AddMod, AddMod), // 8-bit
-    SUB(AddMod),         // 8-bit
-    XOR(AddMod),         // 8-bit
-    // Bit Operations Instructions
-    BIT(usize, AddMod),
-    RES(usize, AddMod),
-    SET(usize, AddMod),
-    SWAP(AddMod),
-    // Bit Shift Instructions
-    RL(AddMod),
-    RLA,
-    RLC(AddMod),
-    RLCA,
-    RR(AddMod),
-    RRA,
-    RRC(AddMod),
-    RRCA,
-    SLA(AddMod),
-    SRA(AddMod),
-    SRL(AddMod),
-    // Load Instructions
-    LD(AddMod, AddMod),
-    LDH(AddMod, AddMod),
-    // Jumps and Subroutines
-    CALL(AddMod),
-    CALLcc(CC, AddMod),
-    JP(AddMod),
-    JPcc(CC, AddMod),
-    JR(AddMod),
-    JRcc(CC, AddMod),
-    RET,
-    RETcc(CC),
-    RETI,
-    RST(usize),
-    // Stack Operations Instructions
-    POP(AddMod),
-    PUSH(AddMod),
-    // Miscellaneous Instructions
+pub enum Operation {
+    ADD(Op, Op),
+    AND(Op),
+    CALL(Op),
+    CALLcc(CC, Op),
+    BIT(usize, Op),
+    CBPrefix,
     CCF,
+    CP(Op),
     CPL,
     DAA,
+    DEC(Op),
     DI,
     EI,
     HALT,
+    INC(Op),
+    JP(Op),
+    JPcc(CC, Op),
+    JR(Op),
+    JRcc(CC, Op),
+    LD(Op, Op),
+    LDH(Op, Op),
     NOP,
+    OR(Op),
+    POP(Op),
+    PUSH(Op),
+    RES(usize, Op),
+    RET,
+    RETcc(CC),
+    RETI,
+    RL(Op),
+    RLA,
+    RLC(Op),
+    RLCA,
+    RR(Op),
+    RRA,
+    RRC(Op),
+    RRCA,
+    RST(usize),
+    SBC(Op, Op),
     SCF,
+    SET(usize, Op),
+    SLA(Op),
+    SRA(Op),
+    SRL(Op),
     STOP,
-    CBPrefix,
+    SUB(Op),
+    SWAP(Op),
+    XOR(Op),
+    ADC(Op, Op),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Instruction {
+    pub(crate) operation: Operation,
+    pub(crate) size: usize,
+    pub(crate) cycles: usize,
+    pub(crate) cycles_not_taken: usize,
+}
+
+impl Instruction {
+    pub(crate) fn from(operation: Operation, size: usize, cycles: usize, cycles_not_taken: usize) -> Self {
+        Self {
+            operation,
+            size,
+            cycles,
+            cycles_not_taken,
+        }
+    }
 }

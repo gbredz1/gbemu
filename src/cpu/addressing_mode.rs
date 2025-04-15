@@ -13,7 +13,7 @@ pub use Register as Reg;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Condition {
     NZ, Z,
-    NC, C
+    NC, C,
 }
 pub use Condition as CC;
 
@@ -34,51 +34,51 @@ macro_rules! z_cc {
 pub enum AddressingMode {
     Immediate,                          // n
     ImmediateExtended,                  // nn
-    Relative,                           // d -> PC+d
+    Relative,                           // d -> PC+e
     Indirect,                           // (n) -> (0xFF00+n)
     Extended,                           // (nn)
     Register(Reg),                      // X
-    RegisterPostIncrement(Reg),          // C+
     RegisterIndirect(Reg),              // (C)
     RegisterIndirectPostIncrement(Reg), // (C)+
     RegisterIndirectPostDecrement(Reg), // (C)-
-    RegisterIndirectDec(Reg),           // (C)
+    AdjustedStackPointer,               // SP+e
 }
-pub use AddressingMode as AddMod;
+pub use AddressingMode as Op; // Operand
 
 #[macro_export]
 macro_rules! z {
     ($y:expr) => {
         match ($y) {
-            "A" => AddMod::Register(Reg::A),
-            "F" => AddMod::Register(Reg::F),
-            "B" => AddMod::Register(Reg::B),
-            "C" => AddMod::Register(Reg::C),
-            "D" => AddMod::Register(Reg::D),
-            "E" => AddMod::Register(Reg::E),
-            "H" => AddMod::Register(Reg::H),
-            "L" => AddMod::Register(Reg::L),
-            "AF" => AddMod::Register(Reg::AF),
-            "BC" => AddMod::Register(Reg::BC),
-            "DE" => AddMod::Register(Reg::DE),
-            "HL" => AddMod::Register(Reg::HL),
-            "SP" => AddMod::Register(Reg::SP),
-            "SP+d" => AddMod::RegisterPostIncrement(Reg::SP),
+            "A" => Op::Register(Reg::A),
+            "F" => Op::Register(Reg::F),
+            "B" => Op::Register(Reg::B),
+            "C" => Op::Register(Reg::C),
+            "D" => Op::Register(Reg::D),
+            "E" => Op::Register(Reg::E),
+            "H" => Op::Register(Reg::H),
+            "L" => Op::Register(Reg::L),
+            "AF" => Op::Register(Reg::AF),
+            "BC" => Op::Register(Reg::BC),
+            "DE" => Op::Register(Reg::DE),
+            "HL" => Op::Register(Reg::HL),
+            "SP" => Op::Register(Reg::SP),
 
-            "d" => AddMod::Relative,
-            "n" => AddMod::Immediate,
-            "nn" => AddMod::ImmediateExtended,
+            "e" => Op::Relative,
+            "n" => Op::Immediate,
+            "nn" => Op::ImmediateExtended,
 
-            "(AF)" => AddMod::RegisterIndirect(Reg::AF),
-            "(BC)" => AddMod::RegisterIndirect(Reg::BC),
-            "(DE)" => AddMod::RegisterIndirect(Reg::DE),
-            "(HL)" => AddMod::RegisterIndirect(Reg::HL),
-            "(HL+)" => AddMod::RegisterIndirectPostIncrement(Reg::HL),
-            "(HL-)" => AddMod::RegisterIndirectPostDecrement(Reg::HL),
-            "(SP)" => AddMod::RegisterIndirect(Reg::SP),
-            "(nn)" => AddMod::Extended,
-            "(n)" => AddMod::Indirect,
-            "(C)" => AddMod::RegisterIndirect(Reg::C),
+            "(AF)" => Op::RegisterIndirect(Reg::AF),
+            "(BC)" => Op::RegisterIndirect(Reg::BC),
+            "(DE)" => Op::RegisterIndirect(Reg::DE),
+            "(HL)" => Op::RegisterIndirect(Reg::HL),
+            "(HL+)" => Op::RegisterIndirectPostIncrement(Reg::HL),
+            "(HL-)" => Op::RegisterIndirectPostDecrement(Reg::HL),
+            "(SP)" => Op::RegisterIndirect(Reg::SP),
+            "(nn)" => Op::Extended,
+            "(n)" => Op::Indirect,
+            "(C)" => Op::RegisterIndirect(Reg::C),
+
+            "SP+e" => Op::AdjustedStackPointer,
 
             a => panic!("`{a:}` invalid"),
         }
@@ -88,15 +88,14 @@ macro_rules! z {
 macro_rules! z_r {
     ($y:expr) => {
         match $y {
-            0 => AddMod::Register(Reg::B),
-            1 => AddMod::Register(Reg::C),
-            2 => AddMod::Register(Reg::D),
-            3 => AddMod::Register(Reg::E),
-            4 => AddMod::Register(Reg::H),
-            5 => AddMod::Register(Reg::L),
-            6 => AddMod::RegisterIndirect(Reg::HL),
-            7 => AddMod::Register(Reg::A),
-            a => panic!("r: `{a:}` invalid must be in [0..7]"),
+            0 => Op::Register(Reg::B),
+            1 => Op::Register(Reg::C),
+            2 => Op::Register(Reg::D),
+            3 => Op::Register(Reg::E),
+            4 => Op::Register(Reg::H),
+            5 => Op::Register(Reg::L),
+            7 => Op::Register(Reg::A),
+            a => panic!("r: `{a:}` invalid must be in [0..7] and not equal to 6"),
         }
     };
 }
@@ -104,10 +103,10 @@ macro_rules! z_r {
 macro_rules! z_rp {
     ($y:expr) => {
         match $y {
-            0 => AddMod::Register(Reg::BC),
-            1 => AddMod::Register(Reg::DE),
-            2 => AddMod::Register(Reg::HL),
-            3 => AddMod::Register(Reg::SP),
+            0 => Op::Register(Reg::BC),
+            1 => Op::Register(Reg::DE),
+            2 => Op::Register(Reg::HL),
+            3 => Op::Register(Reg::SP),
             a => panic!("rp: `{a:}` invalid must be in [0..3]"),
         }
     };
@@ -116,10 +115,10 @@ macro_rules! z_rp {
 macro_rules! z_rp2 {
     ($y:expr) => {
         match $y {
-            0 => AddMod::Register(Reg::BC),
-            1 => AddMod::Register(Reg::DE),
-            2 => AddMod::Register(Reg::HL),
-            3 => AddMod::Register(Reg::AF),
+            0 => Op::Register(Reg::BC),
+            1 => Op::Register(Reg::DE),
+            2 => Op::Register(Reg::HL),
+            3 => Op::Register(Reg::AF),
             a => panic!("rp2: `{a:}` invalid must be in [0..3]"),
         }
     };
