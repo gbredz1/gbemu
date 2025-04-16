@@ -2,15 +2,14 @@
 pub mod spec_tests {}
 #[cfg(test)]
 mod tests {
-    use crate::cpu::decoder::{DecoderMask, LR35902Decoder};
+    use crate::cpu::decoder::DecoderMask;
+    use crate::cpu_decode;
 
     #[test]
     fn instruction_decode_test() {
-        let decoder = LR35902Decoder::default();
-
         let mut errors = vec![];
         for &(opcode, _, _, _, desc) in MAIN_INSTR_SPECS.iter() {
-            if let Some(instruction) = decoder.decode(opcode) {
+            if let Some(instruction) = cpu_decode!(opcode) {
                 let str = format!("{}", instruction.operation);
                 if str != desc {
                     errors.push(format!(
@@ -31,11 +30,9 @@ mod tests {
 
     #[test]
     fn instruction_size_test() {
-        let decoder = LR35902Decoder::default();
-
         let mut errors = vec![];
         for &(opcode, expected_size, _, _, desc) in MAIN_INSTR_SPECS.iter() {
-            if let Some(instruction) = decoder.decode(opcode) {
+            if let Some(instruction) = cpu_decode!(opcode) {
                 if instruction.size != expected_size {
                     errors.push(format!(
                         "!> {} (0x{:02X}): expected size {} but found {} -- {}",
@@ -58,11 +55,9 @@ mod tests {
 
     #[test]
     fn instruction_timings_test() {
-        let decoder = LR35902Decoder::default();
-
         let mut errors = vec![];
         for &(opcode, _, cycles, cycles_not_taken, desc) in MAIN_INSTR_SPECS.iter() {
-            if let Some(instruction) = decoder.decode(opcode) {
+            if let Some(instruction) = cpu_decode!(opcode) {
                 if instruction.cycles != cycles {
                     errors.push(format!(
                         "!> {} (0x{:02X}): expected cycles {} but found {} -- {}",

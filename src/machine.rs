@@ -10,7 +10,7 @@ pub struct Machine {
 
 impl Machine {
     pub fn cycle(&mut self) -> Result<bool, Box<dyn Error>> {
-        self.cpu.cycle(&self.bus)?;
+        self.cpu.cycle(&mut self.bus)?;
 
         Ok(true)
     }

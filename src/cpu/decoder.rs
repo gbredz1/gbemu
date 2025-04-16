@@ -1,22 +1,63 @@
 use crate::cpu::addressing_mode::*;
 use crate::cpu::instruction::Instruction;
 use crate::cpu::instruction::Operation::*;
-use crate::{z, z_cc, z_r, z_rp, z_rp2};
 use std::fmt::{Display, Formatter};
+use std::sync::OnceLock;
+use crate::z;
 
-pub struct LR35902Decoder {
-    main: [Option<Instruction>; 256],
+#[macro_export]
+macro_rules! cpu_decode {
+    ($opcode:expr) => {
+        $crate::cpu::decoder::LR35902Decoder::decode($opcode)
+    };
 }
-impl Default for LR35902Decoder {
-    fn default() -> Self {
-        let mut decoder = LR35902Decoder {
-            main: [const { None }; 256],
-        };
 
-        decoder.initialize_main_table();
-
-        decoder
-    }
+macro_rules! z_cc {
+    ($y:expr) => {
+        match ($y) {
+            0 => CC::NZ,
+            1 => CC::Z,
+            2 => CC::NC,
+            3 => CC::C,
+            a => panic!("CC: {a:} invalid must be in [0..3]"),
+        }
+    };
+}
+macro_rules! z_r {
+    ($y:expr) => {
+        match $y {
+            0 => Op::Register(Reg::B),
+            1 => Op::Register(Reg::C),
+            2 => Op::Register(Reg::D),
+            3 => Op::Register(Reg::E),
+            4 => Op::Register(Reg::H),
+            5 => Op::Register(Reg::L),
+            7 => Op::Register(Reg::A),
+            a => panic!("r: `{a:}` invalid must be in [0..7] and not equal to 6"),
+        }
+    };
+}
+macro_rules! z_rp {
+    ($y:expr) => {
+        match $y {
+            0 => Op::Register(Reg::BC),
+            1 => Op::Register(Reg::DE),
+            2 => Op::Register(Reg::HL),
+            3 => Op::Register(Reg::SP),
+            a => panic!("rp: `{a:}` invalid must be in [0..3]"),
+        }
+    };
+}
+macro_rules! z_rp2 {
+    ($y:expr) => {
+        match $y {
+            0 => Op::Register(Reg::BC),
+            1 => Op::Register(Reg::DE),
+            2 => Op::Register(Reg::HL),
+            3 => Op::Register(Reg::AF),
+            a => panic!("rp2: `{a:}` invalid must be in [0..3]"),
+        }
+    };
 }
 
 macro_rules! instr {
@@ -31,15 +72,24 @@ macro_rules! instr {
     };
 }
 
+pub(crate) struct LR35902Decoder {}
+
+static MAIN_TABLE: OnceLock<[Option<Instruction>; 256]> = OnceLock::new();
+pub fn get_main_table() -> &'static [Option<Instruction>; 256] {
+    MAIN_TABLE.get_or_init(|| LR35902Decoder::build_main_table())
+}
+
 impl LR35902Decoder {
     //     Opcode        http://www.z80.info/decoding.htm
     //                   https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html
     // 7 6 5 4 3 2 1 0
     // -x- --y-- --z--   x=[0..3], y=[0..7], x=[0..7]
     //     -p- q         p=[0..3], q=[0..1]
-    fn initialize_main_table(&mut self) {
+    fn build_main_table() -> [Option<Instruction>; 256] {
+        let mut table = [const { None }; 256];
+
         for m in (0..=0xFFu8).map(DecoderMask::from) {
-            self.main[m.opcode as usize] = match (m.x, m.y, m.z, m.p, m.q) {
+            table[m.opcode as usize] = match (m.x, m.y, m.z, m.p, m.q) {
                 (0, 0, 0, _, _) => instr!(NOP, 1, 4),                                      // NOP
                 (0, 1, 0, _, _) => instr!(LD(z!("(nn)"), z!("SP")), 3, 20),                // LD (nn),SP
                 (0, 2, 0, _, _) => instr!(STOP, 2, 4),                                     // STOP
@@ -132,10 +182,14 @@ impl LR35902Decoder {
                 (_, _, _, _, _) => None,
             }
         }
+
+        table
     }
 
-    pub(crate) fn decode(&self, opcode: u8) -> &Option<Instruction> {
-        &self.main[opcode as usize]
+    pub(crate) fn decode(opcode: u8) -> &'static Option<Instruction> {
+        let table = get_main_table();
+
+        &table[opcode as usize]
     }
 }
 
