@@ -39,10 +39,10 @@ pub struct Cpu {
 impl Default for Cpu {
     fn default() -> Self {
         Cpu {
-            af: Register16::new(0),
-            bc: Register16::new(0),
-            de: Register16::new(0),
-            hl: Register16::new(0),
+            af: Register16::new(0x01B0), // BMG = $01.., GGC = $11..
+            bc: Register16::new(0x0013),
+            de: Register16::new(0x00D8),
+            hl: Register16::new(0x014D),
             sp: 0xFFFE,
             pc: 0x0100,
             halted: false,
@@ -65,7 +65,7 @@ impl Cpu {
                 data.push(self.pc_read_byte(bus));
             }
 
-            debug!(
+            let opcode_debug = format!(
                 "${:04X} > {:02X}{:<20}; {}",
                 opcode_addr,
                 opcode,
@@ -82,6 +82,21 @@ impl Cpu {
                 },
                 instruction.operation,
             );
+            let cpu_debug = format!(
+                "[{} {} {} {}] AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} SP: {:04X} PC: {:04X}",
+                if self.flag(Flags::Z) { "Z" } else { "-" },
+                if self.flag(Flags::N) { "N" } else { "-" },
+                if self.flag(Flags::H) { "H" } else { "-" },
+                if self.flag(Flags::C) { "C" } else { "-" },
+                self.af.value(),
+                self.bc.value(),
+                self.de.value(),
+                self.hl.value(),
+                self.sp,
+                self.pc,
+            );
+
+            debug!("{} || {}", cpu_debug, opcode_debug);
 
             instruction.execute(self, bus, data);
             Ok(())
@@ -128,8 +143,8 @@ impl Cpu {
     pub fn set_e(&mut self, value: u8) {
         self.de.set_low(value);
     }
-    pub fn f(&self) -> Flags {
-        Flags::from_bits_truncate(self.af.low())
+    pub fn f(&self) -> u8 {
+        self.af.low()
     }
     pub fn set_f(&mut self, value: u8) {
         self.af.set_low(value);
@@ -187,13 +202,13 @@ impl Cpu {
 
     // Flags accessors
     pub fn flag(&self, flag: Flags) -> bool {
-        self.f().contains(flag)
+        Flags::from_bits_truncate(self.f()).contains(flag)
     }
     pub fn set_flag(&mut self, flag: Flags) {
-        self.f().insert(flag)
+        self.set_f(self.f() | flag.bits());
     }
     pub fn clear_flag(&mut self, flag: Flags) {
-        self.f().remove(flag)
+        self.set_f(self.f() & !flag.bits());
     }
     pub fn set_flag_if(&mut self, flag: Flags, condition: bool) {
         if condition {
@@ -209,5 +224,60 @@ impl Cpu {
             CC::NC => !self.flag(Flags::C),
             CC::C => self.flag(Flags::C),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_flags() {
+        let mut cpu = Cpu::default();
+        cpu.set_f(0x00); // clear all flags
+
+        // Test that flags are cleared
+        assert!(!cpu.flag(Flags::Z));
+        assert!(!cpu.flag(Flags::N));
+        assert!(!cpu.flag(Flags::H));
+        assert!(!cpu.flag(Flags::C));
+
+        // Test setting a single flag
+        cpu.set_flag(Flags::Z);
+        assert!(cpu.flag(Flags::Z));
+        assert!(!cpu.flag(Flags::N));
+
+        // Test clearing a single flag
+        cpu.clear_flag(Flags::Z);
+        assert!(!cpu.flag(Flags::Z));
+
+        // Test setting multiple flags
+        cpu.set_flag(Flags::N);
+        cpu.set_flag(Flags::H);
+        assert!(cpu.flag(Flags::N));
+        assert!(cpu.flag(Flags::H));
+        assert!(!cpu.flag(Flags::C));
+
+        // Test `set_flag_if` method
+        cpu.set_flag_if(Flags::C, true);
+        assert!(cpu.flag(Flags::C));
+        cpu.set_flag_if(Flags::C, false);
+        assert!(!cpu.flag(Flags::C));
+
+        // Verify no unintended flag manipulation
+        assert!(cpu.flag(Flags::N));
+        assert!(cpu.flag(Flags::H));
+        assert!(!cpu.flag(Flags::Z));
+
+        // Test `check_condition` method
+        assert!(cpu.check_condition(CC::NZ)); // Not Zero flag should be true
+        cpu.set_flag(Flags::Z);
+        assert!(cpu.check_condition(CC::Z)); // Zero flag should now be true
+        assert!(!cpu.check_condition(CC::NZ)); // Not Zero flag should now be false
+        cpu.clear_flag(Flags::Z);
+
+        cpu.set_flag(Flags::C);
+        assert!(cpu.check_condition(CC::C)); // Carry flag should be true
+        assert!(!cpu.check_condition(CC::NC)); // Not Carry should be false
     }
 }
