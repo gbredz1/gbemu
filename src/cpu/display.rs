@@ -1,12 +1,12 @@
-use crate::cpu::addressing_mode::{AddressingMode, CC, Reg, Register};
+use crate::cpu::addressing_mode::{AddressingMode, Register, CC};
 use crate::cpu::instruction::Operation;
-use AddressingMode::*;
-use Operation::*;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use AddressingMode::*;
+use Operation::*;
 
 impl Display for Operation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ADC(o1, o2) => write!(f, "ADC {},{}", o1, o2),
             ADD(o1, o2) => write!(f, "ADD {},{}", o1, o2),
@@ -62,7 +62,7 @@ impl Display for Operation {
 }
 
 impl Display for AddressingMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             AdjustedStackPointer => write!(f, "SP+e"),
             Extended => write!(f, "(nn)"),
@@ -79,7 +79,7 @@ impl Display for AddressingMode {
 }
 
 impl Display for CC {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             CC::C => write!(f, "C"),
             CC::NC => write!(f, "NC"),
@@ -92,19 +92,19 @@ impl Display for CC {
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Reg::A => write!(f, "A"),
-            Reg::B => write!(f, "B"),
-            Reg::C => write!(f, "C"),
-            Reg::D => write!(f, "D"),
-            Reg::E => write!(f, "E"),
-            Reg::H => write!(f, "H"),
-            Reg::L => write!(f, "L"),
-            Reg::F => write!(f, "F"),
-            Reg::AF => write!(f, "AF"),
-            Reg::BC => write!(f, "BC"),
-            Reg::DE => write!(f, "DE"),
-            Reg::HL => write!(f, "HL"),
-            Reg::SP => write!(f, "SP"),
+            Register::A => write!(f, "A"),
+            Register::B => write!(f, "B"),
+            Register::C => write!(f, "C"),
+            Register::D => write!(f, "D"),
+            Register::E => write!(f, "E"),
+            Register::H => write!(f, "H"),
+            Register::L => write!(f, "L"),
+            Register::F => write!(f, "F"),
+            Register::AF => write!(f, "AF"),
+            Register::BC => write!(f, "BC"),
+            Register::DE => write!(f, "DE"),
+            Register::HL => write!(f, "HL"),
+            Register::SP => write!(f, "SP"),
         }
     }
 }

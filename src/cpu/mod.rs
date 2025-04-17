@@ -3,6 +3,7 @@ mod cpu_bus;
 
 use crate::cpu::addressing_mode::CC;
 pub(crate) use crate::cpu::cpu_bus::CpuBus;
+use crate::cpu::register::Register16;
 use bitflags::bitflags;
 use log::debug;
 
@@ -25,45 +26,38 @@ bitflags! {
     }
 }
 
-pub struct CPU {
-    pub a: u8,
-    pub f: Flags, // Flags (Z, N, H, C)
-    pub b: u8,
-    pub c: u8,
-    pub d: u8,
-    pub e: u8,
-    pub h: u8,
-    pub l: u8,
-    pub sp: u16,
-    pub pc: u16,
-    pub halted: bool,
+pub struct Cpu {
+    af: Register16,
+    bc: Register16,
+    de: Register16,
+    hl: Register16,
+    sp: u16,
+    pc: u16,
+    halted: bool,
 }
 
-impl Default for CPU {
+impl Default for Cpu {
     fn default() -> Self {
-        CPU {
-            a: 0,
-            f: Flags::empty(),
-            b: 0,
-            c: 0,
-            d: 0,
-            e: 0,
-            h: 0,
-            l: 0,
+        Cpu {
+            af: Register16::new(0),
+            bc: Register16::new(0),
+            de: Register16::new(0),
+            hl: Register16::new(0),
             sp: 0xFFFE,
             pc: 0x0100,
             halted: false,
         }
     }
 }
-impl CPU {
+impl Cpu {
     pub fn cycle(&mut self, bus: &mut impl CpuBus) -> Result<(), String> {
         if self.halted {
             return Ok(());
         }
 
+        let opcode_addr = self.pc;
         let opcode = self.pc_read_byte(bus);
-        debug!("opcode: ${:02x}", opcode);
+
         let instruction = cpu_decode!(opcode);
         if let Some(instruction) = instruction {
             let mut data = vec![];
@@ -72,19 +66,21 @@ impl CPU {
             }
 
             debug!(
-                "exec: [{}]{}",
-                instruction.operation,
+                "${:04X} > {:02X}{:<20}; {}",
+                opcode_addr,
+                opcode,
                 if !data.is_empty() {
                     format!(
-                        " | data [{}]",
+                        " {}",
                         data.iter()
-                            .map(|b| format!("0x{:02X}", b))
+                            .map(|b| format!("{:02X}", b))
                             .collect::<Vec<String>>()
-                            .join(", ")
+                            .join(" ")
                     )
                 } else {
                     String::new()
-                }
+                },
+                instruction.operation,
             );
 
             instruction.execute(self, bus, data);
@@ -96,20 +92,108 @@ impl CPU {
 
     fn pc_read_byte(&mut self, bus: &impl CpuBus) -> u8 {
         let byte = bus.read_byte(self.pc);
-        debug!("pc: ${:04x}: {:02x}", self.pc, byte);
         self.pc = self.pc.wrapping_add(1);
 
         byte
     }
 
-    pub fn get_flag(&self, flag: Flags) -> bool {
-        self.f.contains(flag)
+    // Registers accessors 8 bits
+    pub fn a(&self) -> u8 {
+        self.af.high()
+    }
+    pub fn set_a(&mut self, value: u8) {
+        self.af.set_high(value);
+    }
+    pub fn b(&self) -> u8 {
+        self.bc.high()
+    }
+    pub fn set_b(&mut self, value: u8) {
+        self.bc.set_high(value);
+    }
+    pub fn c(&self) -> u8 {
+        self.bc.low()
+    }
+    pub fn set_c(&mut self, value: u8) {
+        self.bc.set_low(value);
+    }
+    pub fn d(&self) -> u8 {
+        self.de.high()
+    }
+    pub fn set_d(&mut self, value: u8) {
+        self.de.set_high(value);
+    }
+    pub fn e(&self) -> u8 {
+        self.de.low()
+    }
+    pub fn set_e(&mut self, value: u8) {
+        self.de.set_low(value);
+    }
+    pub fn f(&self) -> Flags {
+        Flags::from_bits_truncate(self.af.low())
+    }
+    pub fn set_f(&mut self, value: u8) {
+        self.af.set_low(value);
+    }
+    pub fn h(&self) -> u8 {
+        self.hl.high()
+    }
+    pub fn set_h(&mut self, value: u8) {
+        self.hl.set_high(value);
+    }
+    pub fn l(&self) -> u8 {
+        self.hl.low()
+    }
+    pub fn set_l(&mut self, value: u8) {
+        self.hl.set_low(value);
+    }
+
+    // Register 16-bits accessors
+    pub fn af(&self) -> u16 {
+        self.af.value()
+    }
+    pub fn set_af(&mut self, value: u16) {
+        self.af.set_value(value)
+    }
+    pub fn bc(&self) -> u16 {
+        self.bc.value()
+    }
+    pub fn set_bc(&mut self, value: u16) {
+        self.bc.set_value(value)
+    }
+    pub fn de(&self) -> u16 {
+        self.de.value()
+    }
+    pub fn set_de(&mut self, value: u16) {
+        self.de.set_value(value)
+    }
+    pub fn hl(&self) -> u16 {
+        self.hl.value()
+    }
+    pub fn set_hl(&mut self, value: u16) {
+        self.hl.set_value(value)
+    }
+    pub fn sp(&self) -> u16 {
+        self.sp
+    }
+    pub fn set_sp(&mut self, value: u16) {
+        self.sp = value
+    }
+    pub fn pc(&self) -> u16 {
+        self.pc
+    }
+    pub fn set_pc(&mut self, value: u16) {
+        self.pc = value
+    }
+
+    // Flags accessors
+    pub fn flag(&self, flag: Flags) -> bool {
+        self.f().contains(flag)
     }
     pub fn set_flag(&mut self, flag: Flags) {
-        self.f.insert(flag)
+        self.f().insert(flag)
     }
     pub fn clear_flag(&mut self, flag: Flags) {
-        self.f.remove(flag)
+        self.f().remove(flag)
     }
     pub fn set_flag_if(&mut self, flag: Flags, condition: bool) {
         if condition {
@@ -120,10 +204,10 @@ impl CPU {
     }
     pub fn check_condition(&self, condition: CC) -> bool {
         match condition {
-            CC::NZ => !self.get_flag(Flags::Z),
-            CC::Z => self.get_flag(Flags::Z),
-            CC::NC => !self.get_flag(Flags::C),
-            CC::C => self.get_flag(Flags::C),
+            CC::NZ => !self.flag(Flags::Z),
+            CC::Z => self.flag(Flags::Z),
+            CC::NC => !self.flag(Flags::C),
+            CC::C => self.flag(Flags::C),
         }
     }
 }

@@ -1,10 +1,10 @@
 use crate::bus::Bus;
-use crate::cpu::CPU;
+use crate::cpu::Cpu;
 use std::error::Error;
 
 #[derive(Default)]
 pub struct Machine {
-    pub cpu: CPU,
+    pub cpu: Cpu,
     pub bus: Bus,
 }
 

@@ -1,5 +1,6 @@
 #[rustfmt::skip]
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum Register {
     A, F, AF,
     B, C, BC,
@@ -30,34 +31,90 @@ pub enum AddressingMode {
     RegisterIndirectPostDecrement(Reg), // (C)-
     AdjustedStackPointer,               // SP+e
 }
-pub use AddressingMode as Op; // Operand
+pub use AddressingMode as Op;
+
+// Operands
 #[macro_export]
 macro_rules! z {
-    ("A") => {Op::Register(Reg::A)};
-    ("F") => {Op::Register(Reg::F)};
-    ("B") => {Op::Register(Reg::B)};
-    ("C") => {Op::Register(Reg::C)};
-    ("D") => {Op::Register(Reg::D)};
-    ("E") => {Op::Register(Reg::E)};
-    ("H") => {Op::Register(Reg::H)};
-    ("L" ) => {Op::Register(Reg::L)};
-    ("AF") => {Op::Register(Reg::AF)};
-    ("BC") => {Op::Register(Reg::BC)};
-    ("DE") => {Op::Register(Reg::DE)};
-    ("HL") => {Op::Register(Reg::HL)};
-    ("SP") => {Op::Register(Reg::SP)};
-    ("e") => {Op::Relative};
-    ("n") => {Op::Immediate};
-    ("nn") => {Op::ImmediateExtended};
-    ("(AF)") => {Op::RegisterIndirect(Reg::AF)};
-    ("(BC)") => {Op::RegisterIndirect(Reg::BC)};
-    ("(DE)") => {Op::RegisterIndirect(Reg::DE)};
-    ("(HL)") => {Op::RegisterIndirect(Reg::HL)};
-    ("(HL+)") => {Op::RegisterIndirectPostIncrement(Reg::HL)};
-    ("(HL-)") => {Op::RegisterIndirectPostDecrement(Reg::HL)};
-    ("(SP)") => {Op::RegisterIndirect(Reg::SP)};
-    ("(nn)") => {Op::Extended};
-    ("(n)") => {Op::Indirect};
-    ("(C)") => {Op::RegisterIndirect(Reg::C)};
-    ("SP+e") => {Op::AdjustedStackPointer};
+    ("A") => {
+        Op::Register(Reg::A)
+    };
+    ("B") => {
+        Op::Register(Reg::B)
+    };
+    ("C") => {
+        Op::Register(Reg::C)
+    };
+    ("D") => {
+        Op::Register(Reg::D)
+    };
+    ("E") => {
+        Op::Register(Reg::E)
+    };
+    ("F") => {
+        Op::Register(Reg::F)
+    };
+    ("H") => {
+        Op::Register(Reg::H)
+    };
+    ("L" ) => {
+        Op::Register(Reg::L)
+    };
+    ("AF") => {
+        Op::Register(Reg::AF)
+    };
+    ("BC") => {
+        Op::Register(Reg::BC)
+    };
+    ("DE") => {
+        Op::Register(Reg::DE)
+    };
+    ("HL") => {
+        Op::Register(Reg::HL)
+    };
+    ("SP") => {
+        Op::Register(Reg::SP)
+    };
+    ("e") => {
+        Op::Relative
+    };
+    ("n") => {
+        Op::Immediate
+    };
+    ("nn") => {
+        Op::ImmediateExtended
+    };
+    ("(AF)") => {
+        Op::RegisterIndirect(Reg::AF)
+    };
+    ("(BC)") => {
+        Op::RegisterIndirect(Reg::BC)
+    };
+    ("(DE)") => {
+        Op::RegisterIndirect(Reg::DE)
+    };
+    ("(HL)") => {
+        Op::RegisterIndirect(Reg::HL)
+    };
+    ("(HL+)") => {
+        Op::RegisterIndirectPostIncrement(Reg::HL)
+    };
+    ("(HL-)") => {
+        Op::RegisterIndirectPostDecrement(Reg::HL)
+    };
+    ("(SP)") => {
+        Op::RegisterIndirect(Reg::SP)
+    };
+    ("(nn)") => {
+        Op::Extended
+    };
+    ("(n)") => {
+        Op::Indirect
+    };
+    ("(C)") => {
+        Op::RegisterIndirect(Reg::C)
+    };
+    ("SP+e") => {
+        Op::AdjustedStackPointer
+    };
 }

@@ -1,5 +1,5 @@
 use crate::cpu::CpuBus;
-use log::debug;
+use log::trace;
 use std::default::Default;
 use std::fs::File;
 use std::io::Read;
@@ -21,9 +21,7 @@ impl Bus {
         let mut file = File::open(path)?;
         let mut rom = vec![];
         let size = file.read_to_end(&mut rom)?;
-        for addr in 0..size {
-            self.memory[addr] = rom[addr];
-        }
+        self.memory[..size].copy_from_slice(&rom[..size]);
 
         Ok(size)
     }
@@ -35,7 +33,7 @@ impl CpuBus for Bus {
     }
 
     fn write_byte(&mut self, addr: u16, byte: u8) {
-        debug!("WRITE.B #{:04x}: {:02x}", addr, byte);
+        trace!("WRITE.B #{:04x}: {:02x}", addr, byte);
         self.memory[addr as usize] = byte;
     }
 
@@ -44,7 +42,7 @@ impl CpuBus for Bus {
     }
 
     fn write_word(&mut self, addr: u16, word: u16) {
-        debug!("WRITE.W #{:04x}: {:04x}", addr, word);
+        trace!("WRITE.W #{:04x}: {:04x}", addr, word);
 
         self.memory[addr as usize] = (word >> 8) as u8;
         self.memory[addr as usize + 1] = word as u8;

@@ -1,9 +1,9 @@
 use crate::cpu::addressing_mode::*;
 use crate::cpu::instruction::Instruction;
 use crate::cpu::instruction::Operation::*;
+use crate::z;
 use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;
-use crate::z;
 
 #[macro_export]
 macro_rules! cpu_decode {
@@ -76,7 +76,7 @@ pub(crate) struct LR35902Decoder {}
 
 static MAIN_TABLE: OnceLock<[Option<Instruction>; 256]> = OnceLock::new();
 pub fn get_main_table() -> &'static [Option<Instruction>; 256] {
-    MAIN_TABLE.get_or_init(|| LR35902Decoder::build_main_table())
+    MAIN_TABLE.get_or_init(LR35902Decoder::build_main_table)
 }
 
 impl LR35902Decoder {

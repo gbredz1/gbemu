@@ -1,39 +1,42 @@
-use crate::cpu::CPU;
-
 #[repr(C)] // to keep order
 union UnsafeRegister16 {
     value: u16,
     bytes: (u8, u8), // (low, high) => little-endian
 }
 
-struct Register16 {
+pub(crate) struct Register16 {
     register: UnsafeRegister16,
 }
 
 impl Register16 {
-    fn new() -> Self {
+    pub fn new(value: u16) -> Self {
         Self {
-            register: UnsafeRegister16 { value: 0 },
+            register: UnsafeRegister16 { value },
         }
     }
 
-    fn value(&self) -> u16 {
+    pub fn value(&self) -> u16 {
         unsafe { self.register.value }
     }
-    fn set_value(&mut self, value: u16) {
-        unsafe { self.register.value = value }
+    pub fn set_value(&mut self, value: u16) {
+        self.register.value = value;
     }
-    fn high(&self) -> u8 {
+    pub fn high(&self) -> u8 {
         unsafe { self.register.bytes.1 }
     }
-    fn set_high(&mut self, high: u8) {
-        unsafe { self.register.bytes.1 = high }
+    #[allow(unused_unsafe)] // ## E0133 mismatch
+    pub fn set_high(&mut self, high: u8) {
+        unsafe {
+            self.register.bytes.1 = high;
+        }
     }
-    fn set_low(&mut self, low: u8) {
-        unsafe { self.register.bytes.0 = low }
+    #[allow(unused_unsafe)] // ## E0133 mismatch
+    pub fn set_low(&mut self, low: u8) {
+        unsafe {
+            self.register.bytes.0 = low;
+        }
     }
-    fn low(&self) -> u8 {
+    pub fn low(&self) -> u8 {
         unsafe { self.register.bytes.0 }
     }
 }
-
