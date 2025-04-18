@@ -1,10 +1,7 @@
-[package]
-name = "gameboy"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = ["cli", "core"]
 
-[dependencies]
-bitflags = "2.9"
-log = "0.4"
-env_logger = "0.11"
-dotenv = "0.15"
+[workspace.package]
+
+[workspace.dependencies]
