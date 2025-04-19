@@ -17,8 +17,12 @@ pub struct Machine {
 impl Machine {
     const CPU_STEP_NS: i64 = 238_000_000; // ~4194304 Hz
 
-    pub fn load_cartridge(&mut self, p0: &str) -> Result<usize, std::io::Error> {
-        self.bus.load_cartridge(p0)
+    pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
+        self.bus.load_cartridge(path)
+    }
+
+    pub fn frame(&self) -> &Vec<u8> {
+        &self.ppu.frame_buffer
     }
 
     pub fn update(&mut self, delta: &Duration) -> Result<(), Box<dyn Error>> {

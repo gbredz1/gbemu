@@ -9,4 +9,3 @@ dotenv = "0.15"
 gbrust-core = { path = "../core" }
 crossterm = "0.29"
 ratatui = "0.29"
-log = "0.4"

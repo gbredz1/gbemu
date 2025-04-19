@@ -11,8 +11,7 @@ pub(crate) struct Ppu {
     mode_clock: u32, // Cycle counter for current mode
 
     // buffer
-    frame_buffer: [u8; 160 * 144 * 4],
-    frame_complete: bool,
+    pub frame_buffer: Vec<u8>,
 }
 
 impl Default for Ppu {
@@ -20,8 +19,7 @@ impl Default for Ppu {
         Self {
             mode: Mode::HBlank,
             mode_clock: 0,
-            frame_buffer: [0; 160 * 144 * 4],
-            frame_complete: false,
+            frame_buffer: vec![0; 160 * 144],
         }
     }
 }

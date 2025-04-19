@@ -1,6 +1,7 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use gbrust_core::Machine;
 use ratatui::prelude::*;
+use ratatui::widgets::canvas::{Canvas, Points};
 use ratatui::widgets::{Block, Paragraph, Wrap};
 use ratatui::DefaultTerminal;
 use std::io;
@@ -77,6 +78,9 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
+        const GB_WIDTH: usize = 160;
+        const GB_HEIGHT: usize = 144;
+
         let vertical = Layout::vertical([
             Constraint::Percentage(80), // screen § debug
             Constraint::Percentage(20), // logs
@@ -89,7 +93,48 @@ impl App {
         .areas(content_area);
 
         // Screen
-        let screen_block = Block::default().title("Screen");
+        let screen_block = Canvas::default()
+            .block(Block::default().title("Screen"))
+            .paint(|ctx| {
+                let frame_buffer = self.machine.frame();
+                let mut color_0 = vec![];
+                let mut color_1 = vec![];
+                let mut color_2 = vec![];
+                let mut color_3 = vec![];
+
+                for y in 0..GB_WIDTH {
+                    for x in 0..GB_HEIGHT {
+                        let idx = y * GB_HEIGHT + x;
+
+                        let bytes = frame_buffer[idx];
+                        match bytes {
+                            1 => color_1.push((x as f64, y as f64)),
+                            2 => color_2.push((x as f64, y as f64)),
+                            3 => color_3.push((x as f64, y as f64)),
+                            _ => color_0.push((x as f64, y as f64)),
+                        }
+                    }
+                }
+
+                ctx.draw(&Points {
+                    coords: &color_0,
+                    color: Color::Rgb(155, 188, 15),
+                });
+                ctx.draw(&Points {
+                    coords: &color_1,
+                    color: Color::Rgb(139, 172, 15),
+                });
+                ctx.draw(&Points {
+                    coords: &color_2,
+                    color: Color::Rgb(48, 98, 48),
+                });
+                ctx.draw(&Points {
+                    coords: &color_3,
+                    color: Color::Rgb(15, 56, 15),
+                });
+            })
+            .x_bounds([0.0, GB_WIDTH as f64])
+            .y_bounds([0.0, GB_HEIGHT as f64]);
         frame.render_widget(screen_block, screen_area);
 
         // Debug infos

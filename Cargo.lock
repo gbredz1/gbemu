@@ -308,7 +308,6 @@ dependencies = [
  "dotenv",
  "env_logger",
  "gbrust-core",
- "log",
  "ratatui",
 ]
 
