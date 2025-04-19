@@ -1,3 +1,4 @@
+use crate::bus::{Interrupt, InterruptBus};
 use bitflags::bitflags;
 
 // Define bitflags for LCD Control Register ($FF40)
@@ -64,10 +65,7 @@ bitflags! {
 }
 
 #[allow(dead_code)]
-pub trait PpuBus {
-    fn read_byte(&self, address: u16) -> u8;
-    fn write_byte(&mut self, address: u16, value: u8);
-
+pub trait PpuBus: InterruptBus {
     fn lcdc(&self) -> LcdControl {
         LcdControl::from_bits_truncate(self.read_byte(0xFF40))
     }
@@ -161,5 +159,8 @@ pub trait PpuBus {
     }
     fn set_wx(&mut self, value: u8) {
         self.write_byte(0xFF4B, value);
+    }
+    fn read_oam(&self, address: u16) -> u8 {
+        self.read_byte(0xFE00 + address)
     }
 }

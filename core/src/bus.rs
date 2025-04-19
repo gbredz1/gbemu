@@ -1,9 +1,20 @@
 use crate::cpu::CpuBus;
 use crate::ppu::PpuBus;
+use bitflags::bitflags;
 use log::trace;
 use std::default::Default;
 use std::fs::File;
 use std::io::Read;
+
+bitflags! {
+    pub struct Interrupt: u8 {
+        const VBLANK = 0b0000_0001;  // Bit 0
+        const LCD_STAT = 0b0000_0010; // Bit 1
+        const TIMER = 0b0000_0100;   // Bit 2
+        const SERIAL = 0b0000_1000;  // Bit 3
+        const JOYPAD = 0b0001_0000;  // Bit 4
+    }
+}
 
 pub struct MemorySystem {
     memory: Vec<u8>,
@@ -50,7 +61,39 @@ impl MemorySystem {
     }
 }
 
-impl CpuBus for MemorySystem {
+pub trait BusIO {
+    fn read_byte(&self, address: u16) -> u8;
+    fn write_byte(&mut self, address: u16, byte: u8);
+    fn read_word(&self, address: u16) -> u16;
+    fn write_word(&mut self, address: u16, word: u16);
+}
+
+pub trait InterruptBus: BusIO {
+    fn interrupt_flag(&self) -> Interrupt {
+        Interrupt::from_bits_truncate(self.read_byte(0xFF0F))
+    }
+    fn set_interrupt_flag(&mut self, value: Interrupt) {
+        self.write_byte(0xFF0F, value.bits());
+    }
+    fn update_interrupt_flag(&mut self, flag: Interrupt, enabled: bool) {
+        let current = self.interrupt_flag();
+        if enabled {
+            self.set_interrupt_flag(current | flag);
+        } else {
+            self.set_interrupt_flag(current & !flag);
+        }
+    }
+    fn request_interrupt(&mut self, interrupt: Interrupt) {
+        self.update_interrupt_flag(interrupt, true);
+    }
+    fn interrupt_enable(&self) -> Interrupt {
+        Interrupt::from_bits_truncate(self.read_byte(0xFFFF))
+    }
+    fn set_interrupt_enable(&mut self, value: Interrupt) {
+        self.write_byte(0xFFFF, value.bits());
+    }
+}
+impl BusIO for MemorySystem {
     fn read_byte(&self, addr: u16) -> u8 {
         self.read_byte(addr)
     }
@@ -68,12 +111,6 @@ impl CpuBus for MemorySystem {
     }
 }
 
-impl PpuBus for MemorySystem {
-    fn read_byte(&self, address: u16) -> u8 {
-        self.read_byte(address)
-    }
-
-    fn write_byte(&mut self, address: u16, value: u8) {
-        self.write_byte(address, value);
-    }
-}
+impl CpuBus for MemorySystem {}
+impl PpuBus for MemorySystem {}
+impl InterruptBus for MemorySystem {}

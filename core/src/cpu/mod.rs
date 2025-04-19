@@ -1,6 +1,7 @@
 mod addressing_mode;
 mod cpu_bus;
 
+use crate::bus::Interrupt;
 use crate::cpu::addressing_mode::CC;
 pub(crate) use crate::cpu::cpu_bus::CpuBus;
 use crate::cpu::register::Register16;
@@ -34,6 +35,8 @@ pub struct Cpu {
     sp: u16,
     pc: u16,
     halted: bool,
+    ime: bool,
+    ime_scheduled: bool,
 }
 
 impl Default for Cpu {
@@ -46,13 +49,25 @@ impl Default for Cpu {
             sp: 0xFFFE,
             pc: 0x0100,
             halted: false,
+            ime: false,
+            ime_scheduled: false,
         }
     }
 }
 impl Cpu {
-    pub fn tick(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
+    pub fn step(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
+        let interrupt_cycles = self.handle_interrupt(bus);
+        if interrupt_cycles > 0 {
+            return Ok(interrupt_cycles);
+        }
+
         if self.halted {
             return Ok(4);
+        }
+
+        if self.ime_scheduled {
+            self.ime = true;
+            self.ime_scheduled = false;
         }
 
         let opcode_addr = self.pc;
@@ -112,6 +127,65 @@ impl Cpu {
         self.pc = self.pc.wrapping_add(1);
 
         byte
+    }
+
+    fn handle_interrupt(&mut self, bus: &mut impl CpuBus) -> usize {
+        if self.halted {
+            let if_val = bus.interrupt_flag();
+            let ie_val = bus.interrupt_enable();
+
+            if !(if_val & ie_val).is_empty() {
+                self.halted = false;
+            }
+
+            if !self.ime {
+                return 0;
+            }
+        } else if !self.ime {
+            return 0;
+        }
+
+        let if_val = bus.interrupt_flag();
+        let ie_val = bus.interrupt_enable();
+        let triggered = if_val & ie_val;
+        if triggered.is_empty() {
+            return 0;
+        }
+
+        // Disable IME
+        self.ime = false;
+        self.ime_scheduled = false;
+
+        // Save current PC on the stack
+        self.sp = self.sp.wrapping_sub(2);
+        bus.write_word(self.sp, self.pc);
+
+        // Determine which interrupt to handle (priority: VBlank > LCD STAT > Timer > Serial > Joypad)
+        let interrupt_vector = if triggered.contains(Interrupt::VBLANK) {
+            // Clear VBlank interrupt flag
+            bus.update_interrupt_flag(Interrupt::VBLANK, false);
+            0x0040 // VBlank interrupt address
+        } else if triggered.contains(Interrupt::LCD_STAT) {
+            bus.update_interrupt_flag(Interrupt::LCD_STAT, false);
+            0x0048 // LCD STAT interrupt address
+        } else if triggered.contains(Interrupt::TIMER) {
+            bus.update_interrupt_flag(Interrupt::TIMER, false);
+            0x0050 // Timer interrupt address
+        } else if triggered.contains(Interrupt::SERIAL) {
+            bus.update_interrupt_flag(Interrupt::SERIAL, false);
+            0x0058 // Serial interrupt address
+        } else if triggered.contains(Interrupt::JOYPAD) {
+            bus.update_interrupt_flag(Interrupt::JOYPAD, false);
+            0x0060 // Joypad interrupt address
+        } else {
+            unreachable!("No interrupts triggered despite previous checks");
+        };
+
+        // Set PC to interrupt address
+        self.pc = interrupt_vector;
+
+        // Processing an interrupt takes 20 cycles
+        20
     }
 
     // Registers accessors 8 bits

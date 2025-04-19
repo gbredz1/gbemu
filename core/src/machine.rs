@@ -29,7 +29,7 @@ impl Machine {
         self.accumulator += delta.as_nanos() as i64;
 
         while self.accumulator >= Self::CPU_STEP_NS {
-            let cycles = self.cpu.tick(&mut self.bus)?;
+            let cycles = self.cpu.step(&mut self.bus)?;
             self.ppu.update(&mut self.bus, cycles as u32);
 
             self.accumulator -= Self::CPU_STEP_NS * cycles as i64;
