@@ -50,59 +50,61 @@ impl Default for Cpu {
     }
 }
 impl Cpu {
-    pub fn cycle(&mut self, bus: &mut impl CpuBus) -> Result<(), String> {
+    pub fn tick(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
         if self.halted {
-            return Ok(());
+            return Ok(4);
         }
 
         let opcode_addr = self.pc;
         let opcode = self.pc_read_byte(bus);
 
         let instruction = cpu_decode!(opcode);
-        if let Some(instruction) = instruction {
-            let mut data = vec![];
-            for _ in 1..instruction.size {
-                data.push(self.pc_read_byte(bus));
+        let instruction = match instruction {
+            Some(instruction) => instruction,
+            None => {
+                return Err(format!("Instruction not found: {:02X}", opcode));
             }
+        };
 
-            let opcode_debug = format!(
-                "${:04X} > {:02X}{:<20}; {}",
-                opcode_addr,
-                opcode,
-                if !data.is_empty() {
-                    format!(
-                        " {}",
-                        data.iter()
-                            .map(|b| format!("{:02X}", b))
-                            .collect::<Vec<String>>()
-                            .join(" ")
-                    )
-                } else {
-                    String::new()
-                },
-                instruction.operation,
-            );
-            let cpu_debug = format!(
-                "[{} {} {} {}] AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} SP: {:04X} PC: {:04X}",
-                if self.flag(Flags::Z) { "Z" } else { "-" },
-                if self.flag(Flags::N) { "N" } else { "-" },
-                if self.flag(Flags::H) { "H" } else { "-" },
-                if self.flag(Flags::C) { "C" } else { "-" },
-                self.af.value(),
-                self.bc.value(),
-                self.de.value(),
-                self.hl.value(),
-                self.sp,
-                self.pc,
-            );
-
-            debug!("{} || {}", cpu_debug, opcode_debug);
-
-            instruction.execute(self, bus, data);
-            Ok(())
-        } else {
-            Err(format!("Opcode 0x{:02x} unknown", opcode))
+        let mut data = vec![];
+        for _ in 1..instruction.size {
+            data.push(self.pc_read_byte(bus));
         }
+
+        let opcode_debug = format!(
+            "${:04X} > {:02X}{:<20}; {}",
+            opcode_addr,
+            opcode,
+            if !data.is_empty() {
+                format!(
+                    " {}",
+                    data.iter()
+                        .map(|b| format!("{:02X}", b))
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                )
+            } else {
+                String::new()
+            },
+            instruction.operation,
+        );
+        let cpu_debug = format!(
+            "[{} {} {} {}] AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} SP: {:04X} PC: {:04X}",
+            if self.flag(Flags::Z) { "Z" } else { "-" },
+            if self.flag(Flags::N) { "N" } else { "-" },
+            if self.flag(Flags::H) { "H" } else { "-" },
+            if self.flag(Flags::C) { "C" } else { "-" },
+            self.af.value(),
+            self.bc.value(),
+            self.de.value(),
+            self.hl.value(),
+            self.sp,
+            self.pc,
+        );
+
+        debug!("{} || {}", cpu_debug, opcode_debug);
+
+        Ok(instruction.execute(self, bus, data))
     }
 
     fn pc_read_byte(&mut self, bus: &impl CpuBus) -> u8 {

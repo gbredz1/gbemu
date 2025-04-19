@@ -1,34 +1,15 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use gbrust_core::Machine;
-use log::debug;
-use ratatui::DefaultTerminal;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::DefaultTerminal;
 use std::io;
 use std::sync::{Arc, Mutex};
-
-pub struct AppLogger {
-    logs: Arc<Mutex<Vec<String>>>,
-}
-
-impl io::Write for AppLogger {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Ok(log_str) = String::from_utf8(buf.to_vec()) {
-            if let Ok(mut logs) = self.logs.lock() {
-                logs.push(log_str);
-            }
-        }
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 fn main() -> io::Result<()> {
     dotenv::dotenv().ok();
-
     let logs = Arc::new(Mutex::new(Vec::new()));
     let target = AppLogger {
         logs: Arc::clone(&logs),
@@ -53,6 +34,7 @@ struct App {
     machine: Machine,
     exit: bool,
     logs: Option<Arc<Mutex<Vec<String>>>>,
+    fps: f64,
 }
 
 impl App {
@@ -61,22 +43,36 @@ impl App {
     }
 
     pub fn load(&mut self, path: &str) -> io::Result<()> {
-        self.machine.bus.load_cartridge(path)?;
+        self.machine.load_cartridge(path)?;
 
         Ok(())
     }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        let mut delta = Duration::from_nanos(0);
+        let target_frame_time = Duration::from_secs_f64(1.0 / 60.0);
+
         while !self.exit {
-            self.update()?;
-            terminal.draw(|frame| self.draw(frame))?;
+            let frame_start = Instant::now();
+
             self.handle_events()?;
+            self.update(&delta)?;
+            terminal.draw(|frame| self.draw(frame))?;
+
+            delta = frame_start.elapsed();
+
+            // sleep for loop a 60fps
+            if delta < target_frame_time {
+                sleep(target_frame_time - delta);
+            }
+
+            self.fps = 1.0 / frame_start.elapsed().as_secs_f64();
         }
         Ok(())
     }
 
-    fn update(&mut self) -> io::Result<()> {
-        self.machine.cycle().expect("Cycle failed");
+    fn update(&mut self, delta: &Duration) -> io::Result<()> {
+        self.machine.update(delta).expect("Error while updating machine");
         Ok(())
     }
 
@@ -98,7 +94,8 @@ impl App {
 
         // Debug infos
         let debug_info = format!(
-            "PC: 0x{:04X}\nRegisters: A: {:02X}, F: {:02X}\nSP: 0x{:04X}",
+            "FPS: {:.1}\n\nPC: 0x{:04X}\nRegisters: A: {:02X}, F: {:02X}\nSP: 0x{:04X}",
+            self.fps,
             self.machine.cpu.pc(),
             self.machine.cpu.a(),
             self.machine.cpu.f(),
@@ -126,10 +123,14 @@ impl App {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => self.handle_key_event(key_event),
-            e => debug!("Unhandled event: {:?}", e),
-        };
+        if !event::poll(Duration::from_nanos(0))? {
+            return Ok(());
+        }
+
+        if let Event::Key(key_event) = event::read()? {
+            self.handle_key_event(key_event);
+        }
+
         Ok(())
     }
 
@@ -142,5 +143,24 @@ impl App {
 
     fn exit(&mut self) {
         self.exit = true;
+    }
+}
+
+pub struct AppLogger {
+    logs: Arc<Mutex<Vec<String>>>,
+}
+
+impl io::Write for AppLogger {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if let Ok(log_str) = String::from_utf8(buf.to_vec()) {
+            if let Ok(mut logs) = self.logs.lock() {
+                logs.push(log_str);
+            }
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
