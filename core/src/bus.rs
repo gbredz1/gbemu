@@ -39,20 +39,20 @@ impl MemorySystem {
     }
 
     #[inline(always)]
-    fn read_byte(&self, address: u16) -> u8 {
+    pub fn read_byte(&self, address: u16) -> u8 {
         unsafe { *self.memory.get_unchecked(address as usize) }
     }
     #[inline(always)]
-    fn write_byte(&mut self, address: u16, byte: u8) {
+    pub fn write_byte(&mut self, address: u16, byte: u8) {
         trace!("WRITE.B #{:04x}: {:02x}", address, byte);
         unsafe {
             *self.memory.get_unchecked_mut(address as usize) = byte;
         }
     }
-    fn read_word(&self, address: u16) -> u16 {
+    pub fn read_word(&self, address: u16) -> u16 {
         (self.memory[address as usize] as u16) << 8 | self.memory[address as usize + 1] as u16
     }
-    fn write_word(&mut self, address: u16, word: u16) {
+    pub fn write_word(&mut self, address: u16, word: u16) {
         trace!("WRITE.W #{:04x}: {:04x}", address, word);
         unsafe {
             *self.memory.get_unchecked_mut(address as usize) = (word >> 8) as u8;

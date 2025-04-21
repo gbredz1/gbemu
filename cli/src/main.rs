@@ -1,9 +1,9 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use gbrust_core::Machine;
+use gbrust_core::{CpuFlags, Machine};
+use ratatui::DefaultTerminal;
 use ratatui::prelude::*;
 use ratatui::widgets::canvas::{Canvas, Points};
 use ratatui::widgets::{Block, Paragraph, Wrap};
-use ratatui::DefaultTerminal;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -20,6 +20,7 @@ fn main() -> io::Result<()> {
         .init();
 
     let mut app = App::default();
+    app.step_by_step = true;
     app.set_logs(logs);
     app.load("roms/Tetris (World) (Rev A).gb")?;
 
@@ -36,6 +37,7 @@ struct App {
     exit: bool,
     logs: Option<Arc<Mutex<Vec<String>>>>,
     fps: f64,
+    step_by_step: bool,
 }
 
 impl App {
@@ -45,6 +47,7 @@ impl App {
 
     pub fn load(&mut self, path: &str) -> io::Result<()> {
         self.machine.load_cartridge(path)?;
+        self.machine.reset();
 
         Ok(())
     }
@@ -73,7 +76,12 @@ impl App {
     }
 
     fn update(&mut self, delta: &Duration) -> io::Result<()> {
-        self.machine.update(delta).expect("Error while updating machine");
+        if self.step_by_step {
+            self.machine.step().expect("Error while stepping machine");
+        } else {
+            self.machine.update(delta).expect("Error while updating the machine");
+        }
+
         Ok(())
     }
 
@@ -139,17 +147,31 @@ impl App {
 
         // Debug infos
         let debug_info = format!(
-            "FPS: {:.1}\n\nPC: 0x{:04X}\nRegisters: A: {:02X}, F: {:02X}\nSP: 0x{:04X}",
-            self.fps,
+            "FPS: {:.1}\n\n\
+            AF: {:04X}  Flags: [{}{}{}{}]\n\
+            BC: {:04X}  LCDC:  {:02X}\n\
+            DE: {:04X}  STAT:  {:02X}\n\
+            HL: {:04X}  LY:  {:02X}\n\
+            SP: {:04X}\n\
+            PC: {:04X}\n\n",
+            self.fps, 
+            self.machine.cpu.af(),
+            if self.machine.cpu.flag(CpuFlags::Z) {"Z"} else { "_"},
+            if self.machine.cpu.flag(CpuFlags::N) {"N"} else { "_"},
+            if self.machine.cpu.flag(CpuFlags::H) {"H"} else { "_"},
+            if self.machine.cpu.flag(CpuFlags::C) {"C"} else { "_"},
+            self.machine.cpu.bc(),
+            self.machine.bus.read_byte(0xFF40), // LCDC
+            self.machine.cpu.de(),
+            self.machine.bus.read_byte(0xFF41), // STAT
+            self.machine.cpu.hl(),
+            self.machine.bus.read_byte(0xFF44), // LY
+            self.machine.cpu.sp(),
             self.machine.cpu.pc(),
-            self.machine.cpu.a(),
-            self.machine.cpu.f(),
-            self.machine.cpu.sp()
         );
 
         let debug_widget = Paragraph::new(debug_info)
-            .block(Block::bordered().title("Debug"))
-            .wrap(Wrap { trim: true });
+            .block(Block::bordered().title("Debug"));
 
         frame.render_widget(debug_widget, debug_area);
 
@@ -168,7 +190,7 @@ impl App {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        if !event::poll(Duration::from_nanos(0))? {
+        if !self.step_by_step && !event::poll(Duration::from_nanos(0))? {
             return Ok(());
         }
 
@@ -182,6 +204,7 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => self.exit(),
+            KeyCode::Char('*') => self.machine.cpu.reset(),
             _ => {}
         }
     }

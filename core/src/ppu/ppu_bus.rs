@@ -160,7 +160,12 @@ pub trait PpuBus: InterruptBus {
     fn set_wx(&mut self, value: u8) {
         self.write_byte(0xFF4B, value);
     }
+    
+    
     fn read_oam(&self, address: u16) -> u8 {
         self.read_byte(0xFE00 + address)
+    }
+    fn read_vram(&self, address: u16) -> u8 {
+        self.read_byte(0x8000 + address)
     }
 }

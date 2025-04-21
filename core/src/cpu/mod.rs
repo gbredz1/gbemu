@@ -119,7 +119,14 @@ impl Cpu {
 
         debug!("{} || {}", cpu_debug, opcode_debug);
 
+        if opcode_addr == 0x0219 {
+            panic!("{} || {}", cpu_debug, opcode_debug);
+        }
+
         Ok(instruction.execute(self, bus, data))
+    }
+    pub fn reset(&mut self) {
+        *self = Cpu::default();
     }
 
     fn pc_read_byte(&mut self, bus: &impl CpuBus) -> u8 {

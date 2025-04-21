@@ -7,7 +7,7 @@ use std::time::Duration;
 #[derive(Default)]
 pub struct Machine {
     pub cpu: Cpu,
-    bus: MemorySystem,
+    pub bus: MemorySystem,
     ppu: Ppu,
 
     // timing
@@ -15,7 +15,7 @@ pub struct Machine {
 }
 
 impl Machine {
-    const CPU_STEP_NS: i64 = 238_000_000; // ~4194304 Hz
+    const CPU_STEP_NS: i64 = 238; // ~4194304 Hz
 
     pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
         self.bus.load_cartridge(path)
@@ -29,12 +29,22 @@ impl Machine {
         self.accumulator += delta.as_nanos() as i64;
 
         while self.accumulator >= Self::CPU_STEP_NS {
-            let cycles = self.cpu.step(&mut self.bus)?;
-            self.ppu.update(&mut self.bus, cycles as u32);
-
+            let cycles = self.step()?;
             self.accumulator -= Self::CPU_STEP_NS * cycles as i64;
         }
 
         Ok(())
+    }
+
+    pub fn step(&mut self) -> Result<(usize), Box<dyn Error>> {
+        let cycles = self.cpu.step(&mut self.bus)?;
+        self.ppu.update(&mut self.bus, cycles as u32);
+
+        Ok(cycles)
+    }
+
+    pub fn reset(&mut self) {
+        self.cpu.reset();
+        self.ppu.reset(&mut self.bus);
     }
 }

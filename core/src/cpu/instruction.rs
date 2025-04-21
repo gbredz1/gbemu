@@ -1,5 +1,5 @@
 use crate::cpu::addressing_mode::Reg;
-use crate::cpu::addressing_mode::{Op, CC};
+use crate::cpu::addressing_mode::{CC, Op};
 use crate::cpu::instruction::Operation::*;
 use crate::cpu::{Cpu, CpuBus, Flags};
 use crate::z;
@@ -329,6 +329,17 @@ impl Instruction {
                         write_to_operand_u16!(cpu, bus, op1, val_u16);
                     }
                 );
+
+                self.cycles
+            }
+
+            RST(v) => {
+                // push pc on stack
+                cpu.set_sp(cpu.sp().wrapping_sub(2));
+                bus.write_word(cpu.sp(), cpu.pc());
+
+                // set pc to the address of the rst
+                cpu.set_pc(v as u16);
 
                 self.cycles
             }
