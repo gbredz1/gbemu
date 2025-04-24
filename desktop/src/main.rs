@@ -1,7 +1,7 @@
 use crate::widgets::GameboyScreen;
 use gbrust_core::Machine;
 use iced::time::{self};
-use iced::widget::{Column, Container, Text};
+use iced::widget::{Column, Text};
 use iced::{Element, Subscription};
 use std::time::{Duration, Instant};
 
