@@ -1,7 +1,12 @@
 use gbrust_core::{Cpu, CpuFlags, Machine};
+use iced::advanced::Widget;
+use iced::advanced::subscription::into_recipes;
 use iced::alignment::Horizontal;
-use iced::widget::{button, column, container, row, text};
-use iced::{border, time, Color, Element, Fill, Subscription};
+use iced::widget::{
+    Column, Row, Space, button, column, container, horizontal_rule, horizontal_space, row, scrollable, text,
+    vertical_space,
+};
+use iced::{Color, Element, Fill, Length, Subscription, border, time};
 use std::time::{Duration, Instant};
 
 pub(crate) struct App {
@@ -90,7 +95,10 @@ impl App {
         })
         .center_x(200);
 
-        Element::from(column![controls, cpu_state].spacing(10)) //.explain(Color::BLACK)
+        let listings = view_listings(&self.machine);
+
+        let content = column![controls, row![cpu_state, listings]];
+        Element::from(content).explain(Color::from_rgb8(252, 15, 192))
     }
 }
 
@@ -166,4 +174,33 @@ fn view_cpu_state<'a>(cpu: &Cpu) -> Element<'a, Message> {
     .spacing(6)
     .padding(4)
     .into()
+}
+
+fn view_listings<'a>(machine: &Machine) -> Element<'a, Message> {
+    const TEXT_SIZE: u16 = 14;
+    let instr_row = |addr: u16| -> Element<'a, Message> {
+        let mut items: Vec<Element<'a, Message>> = vec![
+            text(format!("${:04X}", addr))
+                .color(Color::from_rgb8(255, 211, 0))
+                .size(TEXT_SIZE)
+                .into(),
+            text("87").color(Color::from_rgb8(50, 211, 0)).size(TEXT_SIZE).into(),
+            Space::with_width(Length::Fixed(50.0)).into(),
+        ];
+        if machine.cpu().pc() == addr {
+            items.push(text(">").color(Color::from_rgb8(255, 50, 50)).size(TEXT_SIZE).into());
+        }
+        items.push(text("ADD A,A").size(TEXT_SIZE).into());
+
+        Row::with_children(items).spacing(10).width(Fill).into()
+    };
+
+    let mut lines = vec![];
+    for i in 0x0000..0x2000 {
+        lines.push(instr_row(i));
+    }
+
+    let listing = Column::with_children(lines.into_iter().map(Element::from));
+
+    scrollable(listing).height(800).width(400).into()
 }
