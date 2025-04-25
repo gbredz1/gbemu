@@ -1,18 +1,17 @@
+use crate::widgets::screen;
+use crate::widgets::screen::Screen;
 use gbrust_core::{Cpu, CpuFlags, Machine};
 use iced::advanced::Widget;
-use iced::advanced::subscription::into_recipes;
 use iced::alignment::Horizontal;
-use iced::widget::{
-    Column, Row, Space, button, column, container, horizontal_rule, horizontal_space, row, scrollable, text,
-    vertical_space,
-};
+use iced::widget::{Column, Row, Space, button, column, container, row, scrollable, text};
 use iced::{Color, Element, Fill, Length, Subscription, border, time};
 use std::time::{Duration, Instant};
 
 pub(crate) struct App {
     machine: Machine,
-    last_update: Instant,
+    last_update: Option<Instant>,
     is_running: bool,
+    screen: Screen,
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +20,7 @@ pub enum Message {
     TogglePlayback,
     StepOver,
     Reset,
+    Screen(screen::Message),
 }
 
 impl Default for App {
@@ -32,8 +32,9 @@ impl Default for App {
 
         Self {
             machine: device,
-            last_update: Instant::now(),
+            last_update: None,
             is_running: false,
+            screen: Screen::new(),
         }
     }
 }
@@ -54,24 +55,40 @@ impl App {
     pub fn update(&mut self, message: Message) {
         match message {
             Message::Tick(now) => {
-                let delta = now - self.last_update;
-                self.last_update = now;
+                let last_update = self.last_update.unwrap_or(now);
+                let delta = now - last_update;
+                self.last_update = Some(now);
 
                 self.machine.update(&delta).expect("Failed to update machine");
 
                 // if vblank occured or simple 60Hz update
-                //  let frame_buffer = self.machine.frame().clone();
-            }
-            Message::TogglePlayback => {
-                self.is_running = !self.is_running;
+                let frame_buffer = self.machine.frame().clone();
+                self.update(Message::Screen(screen::Message::UpdateFrameBuffer(frame_buffer)))
             }
             Message::StepOver => {
                 self.is_running = false;
+                self.last_update = None;
 
                 self.machine.step().expect("Failed to step");
+                // if vblank occured or simple 60Hz update
+                let frame_buffer = self.machine.frame().clone();
+                self.update(Message::Screen(screen::Message::UpdateFrameBuffer(frame_buffer)))
             }
-            Message::Reset => self.machine.reset(),
-            _ => {}
+
+            Message::TogglePlayback => {
+                self.is_running = !self.is_running;
+                if !self.is_running {
+                    self.last_update = None;
+                }
+            }
+            Message::Reset => {
+                self.machine.reset();
+                self.screen.clear();
+            }
+
+            Message::Screen(msg) => {
+                self.screen.update(msg);
+            }
         }
     }
     pub fn view(&self) -> Element<Message> {
@@ -97,7 +114,9 @@ impl App {
 
         let listings = view_listings(&self.machine);
 
-        let content = column![controls, row![cpu_state, listings]];
+        let screen = self.screen.view().map(move |msg| Message::Screen(msg));
+
+        let content = column![controls, row![cpu_state, listings, screen]];
         Element::from(content).explain(Color::from_rgb8(252, 15, 192))
     }
 }
@@ -196,7 +215,7 @@ fn view_listings<'a>(machine: &Machine) -> Element<'a, Message> {
     };
 
     let mut lines = vec![];
-    for i in 0x0000..0x2000 {
+    for i in 0x0000..0x0100 {
         lines.push(instr_row(i));
     }
 

@@ -1,1 +1,1 @@
-mod screen;
+pub(crate) mod screen;

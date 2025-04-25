@@ -1,20 +1,24 @@
+use iced::ContentFit::Fill;
+use iced::application::Update;
+use iced::event::Status;
 use iced::mouse::Cursor;
-use iced::widget::canvas::{Cache, Geometry, Path};
+use iced::widget::canvas::{Cache, Event, Geometry, Path, Program, event};
 use iced::widget::{Canvas, canvas};
 use iced::{Color, Element, Point, Size};
 use iced::{Rectangle, Renderer, Theme};
+use log::debug;
 
-#[derive(Clone)]
-pub enum Message {
-    FrameReady,
-}
-
-pub struct GameboyScreen {
+pub struct Screen {
     cache: Cache,
     frame_buffer: Vec<u8>,
 }
 
-impl GameboyScreen {
+#[derive(Debug, Clone)]
+pub enum Message {
+    UpdateFrameBuffer(Vec<u8>),
+}
+
+impl Screen {
     const SCREEN_WIDTH: usize = 160;
     const SCREEN_HEIGHT: usize = 144;
 
@@ -24,15 +28,20 @@ impl GameboyScreen {
             frame_buffer: vec![0; Self::SCREEN_WIDTH * Self::SCREEN_HEIGHT],
         }
     }
-    pub fn update_frame_buffer(&mut self, buffer: Vec<u8>) {
-        self.frame_buffer = buffer;
-        self.cache.clear();
+    pub fn update(&mut self, message: Message) {
+        match message {
+            Message::UpdateFrameBuffer(frame_buffer) => {
+                self.frame_buffer = frame_buffer;
+                self.cache.clear();
+            }
+        }
     }
-
-    pub fn update(&mut self, message: Message) {}
-
     pub fn view(&self) -> Element<Message> {
         Canvas::new(self).width(160).height(144).into()
+    }
+
+    pub fn clear(&mut self) {
+        self.cache.clear();
     }
 
     fn color(val: u8) -> Color {
@@ -45,16 +54,16 @@ impl GameboyScreen {
     }
 }
 
-impl canvas::Program<Message> for GameboyScreen {
+impl Program<Message> for Screen {
     type State = ();
 
     fn draw(
         &self,
-        state: &Self::State,
+        _state: &Self::State,
         renderer: &Renderer,
-        theme: &Theme,
+        _theme: &Theme,
         bounds: Rectangle,
-        cursor: Cursor,
+        _cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
         let draw = self.cache.draw(renderer, bounds.size(), |frame| {
             let background = Path::rectangle(
