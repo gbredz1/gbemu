@@ -27,6 +27,8 @@ macro_rules! read_operand_value_u8 {
             z!("n") => $data[0],
             z!("e") => $data[0],
             z!("(HL)") => $bus.read_byte($cpu.hl()),
+            z!("(n)") => $bus.read_byte(0xFF00 | $data[0] as u16),
+            z!("(C)") => $bus.read_byte(0xFF00 | $cpu.c() as u16),
             z!("(nn)") => $bus.read_byte(read_u16_le!($data)),
             _ => {
                 debug!("Unsupported operand: {:?}", $op);
@@ -48,7 +50,7 @@ macro_rules! read_operand_value_u16 {
     };
 }
 macro_rules! write_to_operand_u8 {
-    ($cpu:expr, $bus:expr, $op:expr, $value:expr) => {
+    ($cpu:expr, $bus:expr, $data:expr, $op:expr, $value:expr) => {
         match $op {
             z!("A") => $cpu.set_a($value),
             z!("B") => $cpu.set_b($value),
@@ -57,6 +59,8 @@ macro_rules! write_to_operand_u8 {
             z!("E") => $cpu.set_e($value),
             z!("H") => $cpu.set_h($value),
             z!("L") => $cpu.set_l($value),
+            z!("(n)") => $bus.write_byte(0xFF00 | $data[0] as u16, $value),
+            z!("(C)") => $bus.write_byte(0xFF00 | $cpu.c() as u16, $value),
             z!("(HL)") => $bus.write_byte($cpu.hl(), $value),
             z!("(HL+)") => {
                 $bus.write_byte($cpu.hl(), $value);
@@ -305,16 +309,28 @@ impl Instruction {
                 self.cycles
             }
             DEC(op) => {
-                let mut value = read_operand_value_u8!(cpu, bus, data, op);
-                value = value.wrapping_sub(1);
-                //write_to_operand!(cpu, bus, op, value);
+                let value = read_operand_value_u8!(cpu, bus, data, op);
+                let result = value.wrapping_sub(1);
+                write_to_operand_u8!(cpu, bus, data, op, result);
 
-                cpu.set_flag_if(Flags::Z, value == 0);
+                cpu.set_flag_if(Flags::Z, result == 0);
                 cpu.set_flag(Flags::N);
-                cpu.set_flag_if(Flags::H, value & 0x0F == 0);
+                cpu.set_flag_if(Flags::H, (value & 0x0F) == 0);
                 cpu.clear_flag(Flags::C);
 
                 self.cycles
+            }
+            CP(op) => {
+                let value = read_operand_value_u8!(cpu, bus, data, op);
+                let result = cpu.a().wrapping_sub(value);
+                cpu.set_a(result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.set_flag(Flags::N);
+                cpu.set_flag_if(Flags::H, (cpu.a() & 0x0F) < (value & 0x0F));
+                cpu.set_flag_if(Flags::C, cpu.a() < value);
+
+                self.size
             }
 
             LD(op1, op2) => {
@@ -322,7 +338,7 @@ impl Instruction {
                     op1,
                     {
                         let val_u8 = read_operand_value_u8!(cpu, bus, data, op2);
-                        write_to_operand_u8!(cpu, bus, op1, val_u8);
+                        write_to_operand_u8!(cpu, bus, data, op1, val_u8);
                     },
                     {
                         let val_u16 = read_operand_value_u16!(cpu, bus, data, op2);
@@ -331,6 +347,12 @@ impl Instruction {
                 );
 
                 self.cycles
+            }
+            LDH(op1, op2) => {
+                let val_u8 = read_operand_value_u8!(cpu, bus, data, op2); // A | (n) | (C)
+                write_to_operand_u8!(cpu, bus, data, op1, val_u8); // A | (n) | (C)
+
+                self.size
             }
 
             RST(v) => {
@@ -341,6 +363,15 @@ impl Instruction {
                 // set pc to the address of the rst
                 cpu.set_pc(v as u16);
 
+                self.cycles
+            }
+
+            DI => {
+                cpu.set_ime(false);
+                self.cycles
+            }
+            EI => {
+                cpu.set_ime(true);
                 self.cycles
             }
 

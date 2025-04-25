@@ -6,7 +6,7 @@ use crate::cpu::addressing_mode::CC;
 pub(crate) use crate::cpu::cpu_bus::CpuBus;
 use crate::cpu::register::Register16;
 use bitflags::bitflags;
-use log::debug;
+use log::{debug, trace};
 
 mod decoder;
 mod instruction;
@@ -103,25 +103,7 @@ impl Cpu {
             },
             instruction.operation,
         );
-        let cpu_debug = format!(
-            "[{} {} {} {}] AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} SP: {:04X} PC: {:04X}",
-            if self.flag(Flags::Z) { "Z" } else { "-" },
-            if self.flag(Flags::N) { "N" } else { "-" },
-            if self.flag(Flags::H) { "H" } else { "-" },
-            if self.flag(Flags::C) { "C" } else { "-" },
-            self.af.value(),
-            self.bc.value(),
-            self.de.value(),
-            self.hl.value(),
-            self.sp,
-            self.pc,
-        );
-
-        debug!("{} || {}", cpu_debug, opcode_debug);
-
-        if opcode_addr == 0x0219 {
-            panic!("{} || {}", cpu_debug, opcode_debug);
-        }
+        trace!("{}", opcode_debug);
 
         Ok(instruction.execute(self, bus, data))
     }

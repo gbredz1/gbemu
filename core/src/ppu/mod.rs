@@ -29,7 +29,10 @@ impl Default for Ppu {
 
 impl Ppu {
     pub fn reset(&mut self, bus: &mut impl PpuBus) {
-        *self = Self::default();
+        self.mode = Mode::HBlank;
+        self.mode_clock = 0;
+        self.frame_buffer.fill(4);
+        self.current_line_sprites.clear();
 
         bus.set_ly(0);
         bus.update_stat(

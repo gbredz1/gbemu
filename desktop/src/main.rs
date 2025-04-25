@@ -1,11 +1,11 @@
-use iced::{Font, Settings};
 use crate::app::App;
+use iced::{window, Font, Point, Settings, Size};
 
 mod app;
-mod style;
+pub(crate) mod style;
+pub(crate) mod theme;
 mod views;
 mod widgets;
-mod theme;
 
 fn main() -> iced::Result {
     dotenv::dotenv().ok();
@@ -13,6 +13,11 @@ fn main() -> iced::Result {
 
     iced::application(App::title, App::update, App::view)
         .subscription(App::subscription)
+        .window(window::Settings {
+            size: Size::new(900.0, 500.0),
+            ..window::Settings::default()
+        })
+        .position(window::Position::Specific(Point::new(1000.0, 30.0)))
         .settings(Settings {
             default_font: Font::with_name("Liberation Mono"),
             ..Settings::default()
