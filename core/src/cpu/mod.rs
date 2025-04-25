@@ -6,7 +6,7 @@ use crate::cpu::addressing_mode::CC;
 pub(crate) use crate::cpu::cpu_bus::CpuBus;
 use crate::cpu::register::Register16;
 use bitflags::bitflags;
-use log::{debug, trace};
+use log::trace;
 
 mod decoder;
 mod instruction;

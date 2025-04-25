@@ -16,6 +16,54 @@ bitflags! {
     }
 }
 
+macro_rules! define_flags_accessors {
+    ($name:ident, $addr:expr, $type:ty) => {
+        fn $name(&self) -> $type {
+            <$type>::from_bits_truncate(self.read_byte($addr))
+        }
+
+        paste::paste! {
+            fn [<set_ $name>](&mut self, flags: $type) {
+                let value = self.read_byte($addr) | flags.bits();
+                self.write_byte($addr, value);
+            }
+            fn [<clear_ $name>](&mut self, flags: $type) {
+                let value = self.read_byte($addr) & !flags.bits();
+                self.write_byte($addr, value);
+            }
+            fn [<update_ $name>](&mut self, flags: $type, enabled: bool) {
+                if enabled {
+                    self.[<set_ $name>](flags);
+                } else {
+                    self.[<clear_ $name>](flags);
+                }
+            }
+            fn [<toggle_ $name>](&mut self, flags: $type) {
+                let value = self.read_byte($addr) ^ flags.bits();
+                self.write_byte($addr, value);
+            }
+            fn [<set_ $name:lower _u8>](&mut self, value: u8) {
+                self.write_byte($addr, value);
+            }
+        }
+    };
+}
+pub(crate) use define_flags_accessors;
+macro_rules! define_u8_accessors {
+    ($name:ident, $addr:expr) => {
+        fn $name(&self) -> u8 {
+            self.read_byte($addr)
+        }
+
+        paste::paste! {
+            fn [<set_ $name>](&mut self, value: u8) {
+                self.write_byte($addr, value);
+            }
+        }
+    };
+}
+pub(crate) use define_u8_accessors;
+
 pub struct MemorySystem {
     memory: Vec<u8>,
 }
@@ -69,29 +117,8 @@ pub trait BusIO {
 }
 
 pub trait InterruptBus: BusIO {
-    fn interrupt_flag(&self) -> Interrupt {
-        Interrupt::from_bits_truncate(self.read_byte(0xFF0F))
-    }
-    fn set_interrupt_flag(&mut self, value: Interrupt) {
-        self.write_byte(0xFF0F, value.bits());
-    }
-    fn update_interrupt_flag(&mut self, flag: Interrupt, enabled: bool) {
-        let current = self.interrupt_flag();
-        if enabled {
-            self.set_interrupt_flag(current | flag);
-        } else {
-            self.set_interrupt_flag(current & !flag);
-        }
-    }
-    fn request_interrupt(&mut self, interrupt: Interrupt) {
-        self.update_interrupt_flag(interrupt, true);
-    }
-    fn interrupt_enable(&self) -> Interrupt {
-        Interrupt::from_bits_truncate(self.read_byte(0xFFFF))
-    }
-    fn set_interrupt_enable(&mut self, value: Interrupt) {
-        self.write_byte(0xFFFF, value.bits());
-    }
+    define_flags_accessors!(interrupt_flag, 0xFF0F, Interrupt);
+    define_flags_accessors!(interrupt_enable, 0xFFFF, Interrupt);
 }
 impl BusIO for MemorySystem {
     fn read_byte(&self, addr: u16) -> u8 {
@@ -114,3 +141,43 @@ impl BusIO for MemorySystem {
 impl CpuBus for MemorySystem {}
 impl PpuBus for MemorySystem {}
 impl InterruptBus for MemorySystem {}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    pub(crate) struct TestBus {
+        memory: [u8; 0x10000],
+        _interrupts: u8,
+    }
+
+    impl Default for TestBus {
+        fn default() -> Self {
+            Self {
+                memory: [0; 0x10000],
+                _interrupts: 0,
+            }
+        }
+    }
+
+    impl InterruptBus for TestBus {}
+
+    impl BusIO for TestBus {
+        fn read_byte(&self, address: u16) -> u8 {
+            self.memory[address as usize]
+        }
+
+        fn write_byte(&mut self, address: u16, byte: u8) {
+            self.memory[address as usize] = byte;
+        }
+
+        fn read_word(&self, address: u16) -> u16 {
+            (self.memory[address as usize] as u16) << 8 | self.memory[address as usize + 1] as u16
+        }
+
+        fn write_word(&mut self, address: u16, word: u16) {
+            self.memory[address as usize] = word as u8;
+            self.memory[address as usize + 1] = (word >> 8) as u8;
+        }
+    }
+}

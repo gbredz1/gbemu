@@ -1,19 +1,14 @@
 use crate::style;
 use crate::style::container::panel_content;
 use crate::style::text::{reg_flag, reg8};
-use crate::theme::{ThemeColor, color};
+use crate::theme::color;
 use crate::widgets::screen;
 use crate::widgets::screen::Screen;
 use gbrust_core::{Cpu, CpuFlags, Machine};
 use iced::alignment::{Horizontal, Vertical};
-use iced::widget::{
-    Column, Container, Row, Space, Text, button, column, container, horizontal_space, row, scrollable, text,
-    text_input, vertical_space,
-};
-use iced::window::Settings;
+use iced::widget::{Column, Container, Row, Space, Text, button, column, container, row, scrollable, text, text_input};
 use iced::{Color, Element, Fill, Length, Subscription, time};
 use log::debug;
-use std::fmt::format;
 use std::time::{Duration, Instant};
 use style::container::*;
 use style::text::*;
@@ -43,6 +38,7 @@ impl Default for App {
         device
             .load_cartridge("roms/tetris.gb")
             .expect("Failed to load cartridge");
+        device.reset();
 
         Self {
             machine: device,

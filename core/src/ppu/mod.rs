@@ -1,7 +1,7 @@
 use crate::bus::Interrupt;
 use crate::ppu::mode::Mode;
 pub(crate) use crate::ppu::ppu_bus::PpuBus;
-use crate::ppu::ppu_bus::{LcdControl, LcdStatus, Palette};
+use crate::ppu::ppu_bus::{LcdControl, LcdStatus};
 
 mod mode;
 mod ppu_bus;
@@ -34,33 +34,20 @@ impl Ppu {
         self.frame_buffer.fill(4);
         self.current_line_sprites.clear();
 
+        // ly and lyc can update LCDC
         bus.set_ly(0);
-        bus.update_stat(
-            // By default, we're in Mode 0 (HBlank)
-            LcdStatus::MODE_BIT_0
-                | LcdStatus::MODE_BIT_1
-                // Reset LYC interrupt flags
-                | LcdStatus::LYC_INTERRUPT
-                | LcdStatus::HBLANK_INTERRUPT
-                | LcdStatus::VBLANK_INTERRUPT
-                | LcdStatus::OAM_INTERRUPT
-                // Reset LYC flag
-                | LcdStatus::LYC_EQUAL,
-            false,
-        );
+        bus.set_lyc(0);
 
-        // Reset scroll registers
+        bus.set_lcdc_u8(0x91);
+        bus.set_stat_u8(0x80);
         bus.set_scy(0);
         bus.set_scx(0);
-
-        // Reset window position
+        bus.set_dma_u8(0xFF);
+        bus.set_bgp_u8(0xFC);
+        bus.set_obp0_u8(0xFF);
+        bus.set_obp1_u8(0xFF);
         bus.set_wy(0);
         bus.set_wx(0);
-
-        // Reset palettes to their default values
-        bus.set_bgp(Palette::from_bits_truncate(0xFC)); // Default value for BGP (11111100) - colors 3, 2, 1, 0
-        bus.set_obp0(Palette::from_bits_truncate(0xFF)); // Default value for OBP0
-        bus.set_obp1(Palette::from_bits_truncate(0xFF)); // Default value for OBP1
     }
 
     pub fn update(&mut self, bus: &mut impl PpuBus, cycles: u32) {
@@ -90,21 +77,21 @@ impl Ppu {
         self.mode_clock = 0;
 
         // inc LY
-        let line = bus.ly() + 1;
+        let line = bus.ly().wrapping_add(1);
         bus.set_ly(line);
 
         // Check if we should enter V-Blank
         if line == 144 {
             self.write_ppu_mode(bus, Mode::VBlank);
-            bus.set_stat(LcdStatus::VBLANK_INTERRUPT);
-            bus.request_interrupt(Interrupt::VBLANK);
+            bus.update_stat(LcdStatus::VBLANK_INTERRUPT, true);
+            bus.update_interrupt_flag(Interrupt::VBLANK, true);
         } else {
             // Go back to OAM scan mode
             self.write_ppu_mode(bus, Mode::OAMScan);
 
             // Trigger LCD STAT interrupt if OAM is enabled in STAT
             if bus.stat().contains(LcdStatus::OAM_INTERRUPT) {
-                bus.request_interrupt(Interrupt::LCD_STAT);
+                bus.update_interrupt_flag(Interrupt::LCD_STAT, true);
             }
         }
     }
@@ -128,7 +115,7 @@ impl Ppu {
 
             // Trigger LCD STAT interrupt if OAM is enabled in STAT
             if bus.stat().contains(LcdStatus::OAM_INTERRUPT) {
-                bus.request_interrupt(Interrupt::LCD_STAT);
+                bus.update_interrupt_flag(Interrupt::LCD_STAT, true);
             }
         }
     }
@@ -187,7 +174,7 @@ impl Ppu {
 
         // Trigger LCD STAT interrupt if configured for Mode::PixelTransfer mode
         if bus.stat().contains(LcdStatus::OAM_INTERRUPT) {
-            bus.request_interrupt(Interrupt::LCD_STAT);
+            bus.update_interrupt_flag(Interrupt::LCD_STAT, true);
         }
     }
     /// Pixel transfer mode
@@ -211,7 +198,7 @@ impl Ppu {
 
         // Trigger LCD STAT interrupt if H-Blank is enabled in STAT
         if bus.stat().contains(LcdStatus::HBLANK_INTERRUPT) {
-            bus.request_interrupt(Interrupt::LCD_STAT);
+            bus.update_interrupt_flag(Interrupt::LCD_STAT, true);
         }
     }
 

@@ -1,4 +1,4 @@
-use crate::bus::MemorySystem;
+use crate::bus::{InterruptBus, MemorySystem};
 use crate::cpu::Cpu;
 use crate::ppu::Ppu;
 use std::error::Error;
@@ -49,5 +49,8 @@ impl Machine {
     pub fn reset(&mut self) {
         self.cpu.reset();
         self.ppu.reset(&mut self.bus);
+
+        self.bus.set_interrupt_enable_u8(0x00);
+        self.bus.set_interrupt_flag_u8(0xE1);
     }
 }

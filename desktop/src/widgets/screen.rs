@@ -1,12 +1,9 @@
-use iced::ContentFit::Fill;
-use iced::application::Update;
-use iced::event::Status;
 use iced::mouse::Cursor;
-use iced::widget::canvas::{Cache, Event, Geometry, Path, Program, event};
-use iced::widget::{Canvas, canvas};
+use iced::widget::canvas::{Cache, Geometry, Path, Program};
+use iced::widget::Canvas;
 use iced::{Color, Element, Point, Size};
 use iced::{Rectangle, Renderer, Theme};
-use log::debug;
+
 
 pub struct Screen {
     cache: Cache,
