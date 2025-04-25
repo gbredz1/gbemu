@@ -1,7 +1,8 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["cli", "core", "desktop"]
 
 [workspace.package]
+publish = false
 
 [workspace.dependencies]

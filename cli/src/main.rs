@@ -155,19 +155,19 @@ impl App {
             SP: {:04X}\n\
             PC: {:04X}\n\n",
             self.fps, 
-            self.machine.cpu.af(),
-            if self.machine.cpu.flag(CpuFlags::Z) {"Z"} else { "_"},
-            if self.machine.cpu.flag(CpuFlags::N) {"N"} else { "_"},
-            if self.machine.cpu.flag(CpuFlags::H) {"H"} else { "_"},
-            if self.machine.cpu.flag(CpuFlags::C) {"C"} else { "_"},
-            self.machine.cpu.bc(),
+            self.machine.cpu().af(),
+            if self.machine.cpu().flag(CpuFlags::Z) {"Z"} else { "_"},
+            if self.machine.cpu().flag(CpuFlags::N) {"N"} else { "_"},
+            if self.machine.cpu().flag(CpuFlags::H) {"H"} else { "_"},
+            if self.machine.cpu().flag(CpuFlags::C) {"C"} else { "_"},
+            self.machine.cpu().bc(),
             self.machine.bus.read_byte(0xFF40), // LCDC
-            self.machine.cpu.de(),
+            self.machine.cpu().de(),
             self.machine.bus.read_byte(0xFF41), // STAT
-            self.machine.cpu.hl(),
+            self.machine.cpu().hl(),
             self.machine.bus.read_byte(0xFF44), // LY
-            self.machine.cpu.sp(),
-            self.machine.cpu.pc(),
+            self.machine.cpu().sp(),
+            self.machine.cpu().pc(),
         );
 
         let debug_widget = Paragraph::new(debug_info)
@@ -204,7 +204,7 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => self.exit(),
-            KeyCode::Char('*') => self.machine.cpu.reset(),
+            KeyCode::Char('*') => self.machine.reset(),
             _ => {}
         }
     }

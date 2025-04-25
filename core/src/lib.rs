@@ -5,3 +5,4 @@ pub(crate) mod ppu;
 
 pub use machine::Machine;
 pub use cpu::Flags as CpuFlags;
+pub use cpu::Cpu as Cpu;

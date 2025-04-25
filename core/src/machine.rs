@@ -6,7 +6,7 @@ use std::time::Duration;
 
 #[derive(Default)]
 pub struct Machine {
-    pub cpu: Cpu,
+    cpu: Cpu,
     pub bus: MemorySystem,
     ppu: Ppu,
 
@@ -23,6 +23,9 @@ impl Machine {
 
     pub fn frame(&self) -> &Vec<u8> {
         &self.ppu.frame_buffer
+    }
+    pub fn cpu(&self) -> &Cpu {
+        &self.cpu
     }
 
     pub fn update(&mut self, delta: &Duration) -> Result<(), Box<dyn Error>> {

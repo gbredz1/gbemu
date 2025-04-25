@@ -308,6 +308,20 @@ impl Cpu {
             CC::C => self.flag(Flags::C),
         }
     }
+
+    // Internal methods
+    pub fn ime(&self) -> bool {
+        self.ime
+    }
+    pub fn set_ime(&mut self, value: bool) {
+        self.ime = value;
+    }
+    pub fn halt(&self) -> bool {
+        self.halted
+    }
+    pub fn set_halted(&mut self, value: bool) {
+        self.halted = value;
+    }
 }
 
 #[cfg(test)]
