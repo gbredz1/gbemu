@@ -27,6 +27,16 @@ macro_rules! read_operand_value_u8 {
             z!("n") => $data[0],
             z!("e") => $data[0],
             z!("(HL)") => $bus.read_byte($cpu.hl()),
+            z!("(HL+)") => {
+                let value = $bus.read_byte($cpu.hl());
+                $cpu.set_hl($cpu.hl().wrapping_add(1));
+                value
+            }
+            z!("(HL-)") => {
+                let value = $bus.read_byte($cpu.hl());
+                $cpu.set_hl($cpu.hl().wrapping_sub(1));
+                value
+            }
             z!("(n)") => $bus.read_byte(0xFF00 | $data[0] as u16),
             z!("(C)") => $bus.read_byte(0xFF00 | $cpu.c() as u16),
             z!("(nn)") => $bus.read_byte(read_u16_le!($data)),
@@ -40,6 +50,9 @@ macro_rules! read_operand_value_u8 {
 macro_rules! read_operand_value_u16 {
     ($cpu:expr, $bus:expr, $data:expr, $op:expr) => {
         match $op {
+            z!("AF") => $cpu.af(),
+            z!("BC") => $cpu.bc(),
+            z!("DE") => $cpu.de(),
             z!("nn") => read_u16_le!($data),
             z!("HL") => $cpu.hl(),
             _ => {
@@ -61,6 +74,7 @@ macro_rules! write_to_operand_u8 {
             z!("L") => $cpu.set_l($value),
             z!("(n)") => $bus.write_byte(0xFF00 | $data[0] as u16, $value),
             z!("(C)") => $bus.write_byte(0xFF00 | $cpu.c() as u16, $value),
+            z!("(nn)") => $bus.write_byte(read_u16_le!($data), $value),
             z!("(HL)") => $bus.write_byte($cpu.hl(), $value),
             z!("(HL+)") => {
                 $bus.write_byte($cpu.hl(), $value);
@@ -84,6 +98,7 @@ macro_rules! write_to_operand_u16 {
             z!("BC") => $cpu.set_bc($value),
             z!("DE") => $cpu.set_de($value),
             z!("HL") => $cpu.set_hl($value),
+            z!("SP") => $cpu.set_sp($value),
             _ => {
                 debug!("Unsupported operand: {:?}", $op);
                 unreachable!("Unsupported operand")
@@ -224,6 +239,38 @@ impl Instruction {
 
                 self.cycles
             }
+            CALL(op) => {
+                let dest_addr = read_operand_value_u16!(cpu, bus, data, op);
+                let return_addr = cpu.pc(); // pc already on next opcode
+                cpu.sp_push_word(bus, return_addr);
+                cpu.set_pc(dest_addr);
+
+                self.cycles
+            }
+            CALLcc(cc, op) => {
+                handle_cc_not_taken!(self, cpu, cc);
+
+                let dest_addr = read_operand_value_u16!(cpu, bus, data, op);
+                let return_addr = cpu.pc(); // pc already on next opcode
+                cpu.sp_push_word(bus, return_addr);
+                cpu.set_pc(dest_addr);
+
+                self.cycles
+            }
+            RET => {
+                let return_addr = cpu.sp_pop_word(bus);
+                cpu.set_pc(return_addr);
+
+                self.cycles
+            }
+            RETcc(cc) => {
+                handle_cc_not_taken!(self, cpu, cc);
+
+                let return_addr = cpu.sp_pop_word(bus);
+                cpu.set_pc(return_addr);
+
+                self.cycles
+            }
 
             AND(op) => {
                 let value = read_operand_value_u8!(cpu, bus, data, op);
@@ -301,7 +348,8 @@ impl Instruction {
                 self.cycles
             }
             OR(op) => {
-                cpu.set_a(cpu.a() | read_operand_value_u8!(cpu, bus, data, op));
+                let value = read_operand_value_u8!(cpu, bus, data, op);
+                cpu.set_a(cpu.a() | value);
 
                 cpu.set_flag_if(Flags::Z, cpu.a() == 0);
                 cpu.clear_flag(Flags::N | Flags::H | Flags::C);
@@ -309,13 +357,35 @@ impl Instruction {
                 self.cycles
             }
             DEC(op) => {
+                match_size!(
+                    op,
+                    {
+                        let value = read_operand_value_u8!(cpu, bus, data, op);
+                        let result = value.wrapping_sub(1);
+                        write_to_operand_u8!(cpu, bus, data, op, result);
+
+                        cpu.set_flag_if(Flags::Z, result == 0);
+                        cpu.set_flag(Flags::N);
+                        cpu.set_flag_if(Flags::H, (value & 0x0F) == 0);
+                        cpu.clear_flag(Flags::C);
+                    },
+                    {
+                        let value = read_operand_value_u16!(cpu, bus, data, op);
+                        let result = value.wrapping_sub(1);
+                        write_to_operand_u16!(cpu, bus, op, result);
+                    }
+                );
+
+                self.cycles
+            }
+            INC(op) => {
                 let value = read_operand_value_u8!(cpu, bus, data, op);
-                let result = value.wrapping_sub(1);
+                let result = value.wrapping_add(1);
                 write_to_operand_u8!(cpu, bus, data, op, result);
 
                 cpu.set_flag_if(Flags::Z, result == 0);
-                cpu.set_flag(Flags::N);
-                cpu.set_flag_if(Flags::H, (value & 0x0F) == 0);
+                cpu.clear_flag(Flags::N);
+                cpu.set_flag_if(Flags::H, (value & 0x0F) == 0xF);
                 cpu.clear_flag(Flags::C);
 
                 self.cycles

@@ -1,3 +1,4 @@
+//!
 use crate::cpu::CpuBus;
 use crate::ppu::PpuBus;
 use bitflags::bitflags;
@@ -97,14 +98,17 @@ impl MemorySystem {
             *self.memory.get_unchecked_mut(address as usize) = byte;
         }
     }
+
     pub fn read_word(&self, address: u16) -> u16 {
-        (self.memory[address as usize] as u16) << 8 | self.memory[address as usize + 1] as u16
+        (self.memory[address as usize] as u16)  // LSB first
+            | (self.memory[address as usize + 1] as u16) << 8 // MSB second
     }
+
     pub fn write_word(&mut self, address: u16, word: u16) {
         trace!("WRITE.W #{:04x}: {:04x}", address, word);
         unsafe {
-            *self.memory.get_unchecked_mut(address as usize) = (word >> 8) as u8;
-            *self.memory.get_unchecked_mut(address as usize + 1) = word as u8;
+            *self.memory.get_unchecked_mut(address as usize) = word as u8; // LSB first
+            *self.memory.get_unchecked_mut(address as usize + 1) = (word >> 8) as u8; // MSB second
         }
     }
 }
@@ -143,41 +147,59 @@ impl PpuBus for MemorySystem {}
 impl InterruptBus for MemorySystem {}
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
 
-    pub(crate) struct TestBus {
-        memory: [u8; 0x10000],
-        _interrupts: u8,
-    }
+    #[test]
+    fn test_read_write_byte() {
+        let mut memory = MemorySystem::default();
 
-    impl Default for TestBus {
-        fn default() -> Self {
-            Self {
-                memory: [0; 0x10000],
-                _interrupts: 0,
-            }
+        let test_cases = vec![
+            (0x1234, 0xAB, "at a specific address"),
+            (0x0000, 0x42, "at address 0"),
+            (0xFFFF, 0x55, "at the highest address"),
+        ];
+
+        for (address, value, description) in test_cases {
+            memory.write_byte(address, value);
+            assert_eq!(
+                memory.read_byte(address),
+                value,
+                "{}",
+                format!("Read byte should return the written value {}", description)
+            );
         }
     }
 
-    impl InterruptBus for TestBus {}
+    #[test]
+    fn test_read_write_word() {
+        let mut memory = MemorySystem::default();
+        let test_cases = vec![
+            (0x1234, 0xABCD, "at a specific address"),
+            (0x0000, 0x4242, "at address 0"),
+            (0xFFFE, 0x5555, "at the highest address"),
+        ];
+        for (address, value, description) in test_cases {
+            memory.write_word(address, value);
+            assert_eq!(
+                memory.read_word(address),
+                value,
+                "{}",
+                format!("Read word should return the written value {}", description)
+            );
 
-    impl BusIO for TestBus {
-        fn read_byte(&self, address: u16) -> u8 {
-            self.memory[address as usize]
-        }
-
-        fn write_byte(&mut self, address: u16, byte: u8) {
-            self.memory[address as usize] = byte;
-        }
-
-        fn read_word(&self, address: u16) -> u16 {
-            (self.memory[address as usize] as u16) << 8 | self.memory[address as usize + 1] as u16
-        }
-
-        fn write_word(&mut self, address: u16, word: u16) {
-            self.memory[address as usize] = word as u8;
-            self.memory[address as usize + 1] = (word >> 8) as u8;
+            assert_eq!(
+                memory.read_byte(address),
+                value as u8,
+                "{}",
+                "LSB should be at the given address"
+            );
+            assert_eq!(
+                memory.read_byte(address + 1),
+                (value >> 8) as u8,
+                "{}",
+                "MSB should be at the given address"
+            );
         }
     }
 }

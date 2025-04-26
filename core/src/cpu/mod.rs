@@ -54,6 +54,7 @@ impl Default for Cpu {
         }
     }
 }
+
 impl Cpu {
     pub fn step(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
         let interrupt_cycles = self.handle_interrupt(bus);
@@ -116,6 +117,27 @@ impl Cpu {
         self.pc = self.pc.wrapping_add(1);
 
         byte
+    }
+    fn sp_push_word(&mut self, bus: &mut impl CpuBus, value: u16) {
+        // bus.write_byte(self.sp, (value >> 8) as u8);
+        // self.sp = self.sp.wrapping_sub(1);
+        // bus.write_byte(self.sp, value as u8);
+        // self.sp = self.sp.wrapping_sub(1);
+
+        self.sp = self.sp.wrapping_sub(2);
+        bus.write_word(self.sp, value);
+    }
+    fn sp_pop_word(&mut self, bus: &mut impl CpuBus) -> u16 {
+        // let high = bus.read_byte(self.sp) as u16;
+        // self.sp = self.sp.wrapping_add(1);
+        // let low = bus.read_byte(self.sp) as u16;
+        // self.sp = self.sp.wrapping_add(1);
+        //
+        // high << 8 | low
+
+        let value = bus.read_word(self.sp);
+        self.sp = self.sp.wrapping_add(2);
+        value
     }
 
     fn handle_interrupt(&mut self, bus: &mut impl CpuBus) -> usize {
@@ -309,6 +331,10 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bus::BusIO;
+    use crate::tests::bus::TestBus;
+
+    impl CpuBus for TestBus {}
 
     #[test]
     fn test_flags() {
@@ -358,5 +384,30 @@ mod tests {
         cpu.set_flag(Flags::C);
         assert!(cpu.check_condition(CC::C)); // Carry flag should be true
         assert!(!cpu.check_condition(CC::NC)); // Not Carry should be false
+    }
+
+    #[test]
+    fn test_stack_operations() {
+        let mut cpu = Cpu::default();
+        let mut bus = TestBus::default();
+        cpu.set_sp(0xCFFF);
+
+        let initial_value = 0x1234;
+
+        // push
+        cpu.sp_push_word(&mut bus, initial_value);
+        assert_eq!(cpu.sp(), 0xCFFD, "Stack pointer should be decremented by 2");
+        assert_eq!(bus.read_word(cpu.sp()), initial_value, "Stack value should be written");
+
+        // value written at 0xCFFD and 0xCFFE
+        let high = bus.read_byte(0xCFFE);
+        let low = bus.read_byte(0xCFFD);
+        assert_eq!(low, initial_value as u8, "Low byte should be written first");
+        assert_eq!(high, (initial_value >> 8) as u8, "High byte should be written second");
+
+        // pop
+        let actual_value = cpu.sp_pop_word(&mut bus);
+        assert_eq!(cpu.sp(), 0xCFFF, "Stack pointer should be incremented by 2");
+        assert_eq!(actual_value, initial_value, "Stack value should be read");
     }
 }

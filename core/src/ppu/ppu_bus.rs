@@ -128,7 +128,7 @@ pub trait PpuBus: InterruptBus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bus::tests::TestBus;
+    use crate::tests::bus::TestBus;
 
     impl PpuBus for TestBus {}
 }
