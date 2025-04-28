@@ -271,6 +271,25 @@ impl Instruction {
 
                 self.cycles
             }
+            RETI => {
+                let return_addr = cpu.sp_pop_word(bus);
+                cpu.set_pc(return_addr);
+                cpu.ime = true;
+
+                self.cycles
+            }
+            PUSH(op) => {
+                let value = read_operand_value_u16!(cpu, bus, data, op);
+                cpu.sp_push_word(bus, value);
+
+                self.cycles
+            }
+            POP(op) => {
+                let value = cpu.sp_pop_word(bus);
+                write_to_operand_u16!(cpu, bus, op, value);
+
+                self.cycles
+            }
 
             AND(op) => {
                 let value = read_operand_value_u8!(cpu, bus, data, op);
@@ -402,6 +421,13 @@ impl Instruction {
 
                 self.size
             }
+            CPL => {
+                cpu.set_a(0xFF ^ cpu.a());
+                cpu.set_flag(Flags::N);
+                cpu.set_flag(Flags::H);
+
+                self.cycles
+            }
 
             LD(op1, op2) => {
                 match_size!(
@@ -445,7 +471,25 @@ impl Instruction {
                 self.cycles
             }
 
+            CBPrefix => cpu.fetch_cb_instruction(bus).expect("invalid cb prefix"),
             _ => todo!("not implemented: {}", self.operation),
+        }
+    }
+
+    pub fn execute_cb(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: Vec<u8>) -> usize {
+        match self.operation {
+            SWAP(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = (val & 0xF0) >> 4 | (val & 0x0F) << 4;
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H | Flags::C);
+
+                self.cycles
+            }
+
+            _ => todo!("not implemented: {} (CBPrefix)", self.operation),
         }
     }
 }

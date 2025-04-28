@@ -226,7 +226,7 @@ impl Ppu {
         // Get the background and window tiles to render
         // Background
         if bus.lcdc().contains(LcdControl::BG_WINDOW_ENABLE) {
-            //   self.render_background(bus, line, start_index);
+            self.render_background(bus, line, start_index);
         } else {
             // If the background is disabled, fill with "white" (color 0)
             for x in 0..160 {
@@ -241,7 +241,7 @@ impl Ppu {
 
         // Sprites (if enabled)
         if bus.lcdc().contains(LcdControl::OBJ_ENABLE) {
-            //  self.render_sprites(bus, line, start_index);
+            self.render_sprites(bus, line, start_index);
         }
     }
     fn render_background(&mut self, bus: &impl PpuBus, line: u8, start_index: usize) {

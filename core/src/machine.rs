@@ -47,6 +47,7 @@ impl Machine {
     }
 
     pub fn reset(&mut self) {
+        self.bus.reset();
         self.cpu.reset();
         self.ppu.reset(&mut self.bus);
 

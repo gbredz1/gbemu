@@ -69,6 +69,17 @@ pub struct MemorySystem {
     memory: Vec<u8>,
 }
 
+impl MemorySystem {
+    pub(crate) fn reset(&mut self) {
+        // Clear VRAM
+        self.memory[0x8000..=0x9fff].fill(0);
+
+        // Load the cartridge header logo tiles into VRAM starting at $8010
+        let (head, vram) = self.memory.split_at_mut(0x8000);
+        vram[0x10..=0x3F].copy_from_slice(&head[0x104..=0x133]);
+    }
+}
+
 impl Default for MemorySystem {
     fn default() -> Self {
         Self {

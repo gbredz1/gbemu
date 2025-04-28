@@ -16,7 +16,7 @@ mod decoder_test;
 mod display;
 mod register;
 
-use crate::cpu_decode;
+use crate::{cpu_decode, cpu_decode_cb};
 
 bitflags! {
     pub struct Flags: u8 {
@@ -78,7 +78,7 @@ impl Cpu {
         let instruction = match instruction {
             Some(instruction) => instruction,
             None => {
-                return Err(format!("Instruction not found: {:02X}", opcode));
+                return Err(format!("Instruction not found: 0x{opcode:02X}"));
             }
         };
 
@@ -95,7 +95,7 @@ impl Cpu {
                 format!(
                     " {}",
                     data.iter()
-                        .map(|b| format!("{:02X}", b))
+                        .map(|b| format!("{b:02X}"))
                         .collect::<Vec<String>>()
                         .join(" ")
                 )
@@ -104,10 +104,26 @@ impl Cpu {
             },
             instruction.operation,
         );
-        trace!("{}", opcode_debug);
+        trace!("{opcode_debug}");
 
         Ok(instruction.execute(self, bus, data))
     }
+
+    pub(crate) fn fetch_cb_instruction(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
+        let opcode = self.pc_read_byte(bus);
+
+        let instruction = cpu_decode_cb!(opcode);
+        let instruction = match instruction {
+            Some(instruction) => instruction,
+            None => {
+                return Err(format!("CB Instruction not found: 0x{opcode:02X}"));
+            }
+        };
+
+        let data = vec![]; // all cb instruction size = 1
+        Ok(instruction.execute_cb(self, bus, data))
+    }
+
     pub fn reset(&mut self) {
         *self = Cpu::default();
     }
@@ -193,6 +209,7 @@ impl Cpu {
         };
 
         // Set PC to interrupt address
+        self.sp_push_word(bus, self.pc);
         self.pc = interrupt_vector;
 
         // Processing an interrupt takes 20 cycles

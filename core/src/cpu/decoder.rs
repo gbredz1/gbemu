@@ -12,6 +12,13 @@ macro_rules! cpu_decode {
     };
 }
 
+#[macro_export]
+macro_rules! cpu_decode_cb {
+    ($opcode:expr) => {
+        $crate::cpu::decoder::LR35902Decoder::decode_cb($opcode)
+    };
+}
+
 macro_rules! z_cc {
     ($y:expr) => {
         match ($y) {
@@ -77,6 +84,11 @@ pub(crate) struct LR35902Decoder {}
 static MAIN_TABLE: OnceLock<[Option<Instruction>; 256]> = OnceLock::new();
 pub fn get_main_table() -> &'static [Option<Instruction>; 256] {
     MAIN_TABLE.get_or_init(LR35902Decoder::build_main_table)
+}
+
+static CB_TABLE: OnceLock<[Option<Instruction>; 256]> = OnceLock::new();
+pub fn get_cb_table() -> &'static [Option<Instruction>; 256] {
+    CB_TABLE.get_or_init(LR35902Decoder::build_cb_table)
 }
 
 impl LR35902Decoder {
@@ -188,6 +200,47 @@ impl LR35902Decoder {
 
     pub(crate) fn decode(opcode: u8) -> &'static Option<Instruction> {
         let table = get_main_table();
+
+        &table[opcode as usize]
+    }
+
+    fn build_cb_table() -> [Option<Instruction>; 256] {
+        let mut table = [const { None }; 256];
+
+        for m in (0..=0xFFu8).map(DecoderMask::from) {
+            table[m.opcode as usize] = match (m.x, m.y, m.z, m.p, m.q) {
+                (0, 0, 6, _, _) => instr!(RLC(z!("(HL)")), 2, 16),
+                (0, 0, z, _, _) => instr!(RLC(z_r!(z)), 2, 8),
+                (0, 1, 6, _, _) => instr!(RRC(z!("(HL)")), 2, 16),
+                (0, 1, z, _, _) => instr!(RRC(z_r!(z)), 2, 8),
+                (0, 2, 6, _, _) => instr!(RL(z!("(HL)")), 2, 16),
+                (0, 2, z, _, _) => instr!(RL(z_r!(z)), 2, 8),
+                (0, 3, 6, _, _) => instr!(RR(z!("(HL)")), 2, 16),
+                (0, 3, z, _, _) => instr!(RR(z_r!(z)), 2, 8),
+                (0, 4, 6, _, _) => instr!(SLA(z!("(HL)")), 2, 16),
+                (0, 4, z, _, _) => instr!(SLA(z_r!(z)), 2, 8),
+                (0, 5, 6, _, _) => instr!(SRA(z!("(HL)")), 2, 16),
+                (0, 5, z, _, _) => instr!(SRA(z_r!(z)), 2, 8),
+                (0, 6, 6, _, _) => instr!(SWAP(z!("(HL)")), 2, 16),
+                (0, 6, z, _, _) => instr!(SWAP(z_r!(z)), 2, 8),
+                (0, 7, 6, _, _) => instr!(SRL(z!("(HL)")), 2, 16),
+                (0, 7, z, _, _) => instr!(SRL(z_r!(z)), 2, 8),
+                (1, y, 6, _, _) => instr!(BIT(y, z!("(HL)")), 2, 16),
+                (1, y, z, _, _) => instr!(BIT(y, z_r!(z)), 2, 8),
+                (2, y, 6, _, _) => instr!(RES(y, z!("(HL)")), 2, 16),
+                (2, y, z, _, _) => instr!(RES(y, z_r!(z)), 2, 8),
+                (3, y, 6, _, _) => instr!(SET(y, z!("(HL)")), 2, 16),
+                (3, y, z, _, _) => instr!(SET(y, z_r!(z)), 2, 8),
+                // Unknown
+                (_, _, _, _, _) => None,
+            }
+        }
+
+        table
+    }
+
+    pub(crate) fn decode_cb(opcode: u8) -> &'static Option<Instruction> {
+        let table = get_cb_table();
 
         &table[opcode as usize]
     }

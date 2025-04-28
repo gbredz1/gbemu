@@ -92,10 +92,8 @@ impl App {
                 self.machine.step().expect("Failed to step");
 
                 // if vblank occured or simple 60Hz update
-                // let frame_buffer = self.machine.frame().clone();
-                // self.update(Message::Screen(screen::Message::UpdateFrameBuffer(frame_buffer)))
-
-                Task::none()
+                let frame_buffer = self.machine.frame().clone();
+                self.update(Message::Screen(screen::Message::UpdateFrameBuffer(frame_buffer)))
             }
             Message::StepToAddr(addr) => {
                 self.is_running = false;
@@ -149,7 +147,7 @@ impl App {
             "MEMORY",
             view_memory::view(&self.view_memory_state, &self.machine).map(Message::MemoryView),
         )
-        .center_x(460)
+        .center_x(550)
         .height(370);
 
         let content = column![controls, row![cpu_state, io_registers, screen].spacing(10), memory]

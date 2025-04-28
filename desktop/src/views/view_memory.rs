@@ -231,7 +231,7 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
 
     let mem_ascii = |addr: u16| -> Element<'a, Message> {
         let value = match machine.bus.read_byte(addr) {
-            val if (0x20..=0x7E).contains(&val) => val as char,
+            val if (0x20..=0xFE).contains(&val) => val as char,
             _ => '.',
         };
         text(format!("{value}")).size(SIZE).into()
@@ -244,7 +244,7 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
             text(format!("${addr:04X}")).size(SIZE).width(50).color(orange()),
             memory_row_addr!(mem_byte, addr),
             memory_row_addr!(mem_byte, addr + 8),
-            Row::from_vec((0..=16).map(|i| mem_ascii(addr.wrapping_add(i))).collect()),
+            Row::from_vec((0..=0xF).map(|i| mem_ascii(addr.wrapping_add(i))).collect()),
         ));
     }
 
