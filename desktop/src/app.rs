@@ -1,11 +1,13 @@
 use crate::style;
 use crate::style::text::{reg_flag, reg8};
 use crate::theme::color;
+use crate::views::view_memory;
 use crate::widgets::screen::Screen;
 use crate::widgets::{screen, title_panel};
 use gbrust_core::{Cpu, CpuFlags, Machine};
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
+use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{
     Column, Row, Space, button, column, container, horizontal_space, row, scrollable, text, text_input,
 };
@@ -21,8 +23,8 @@ pub(crate) struct App {
     is_running: bool,
     screen: Screen,
     breakpoint_at: String,
-    show_memory_from: String,
-    show_memory_from_addr: u16,
+
+    view_memory_state: view_memory::State,
 }
 
 #[derive(Debug, Clone)]
@@ -35,8 +37,8 @@ pub enum Message {
     StepToAddrInputChanged(String),
     Screen(screen::Message),
     CloseWindow,
-    MemoryViewAddrStartChanged(String),
-    MemoryViewAddrUpdate(u16),
+
+    MemoryView(view_memory::Message),
 }
 
 impl Default for App {
@@ -52,9 +54,8 @@ impl Default for App {
             last_update: None,
             is_running: false,
             breakpoint_at: "021D".into(),
-            show_memory_from: "000".into(),
-            show_memory_from_addr: 0x000,
             screen: Screen::new(),
+            view_memory_state: view_memory::State::default(),
         }
     }
 }
@@ -143,19 +144,7 @@ impl App {
                 Task::none()
             }
 
-            Message::MemoryViewAddrStartChanged(addr) => {
-                self.show_memory_from = addr;
-
-                match u16::from_str_radix(&self.show_memory_from, 16) {
-                    Ok(addr) if addr <= 0xFFF => self.update(Message::MemoryViewAddrUpdate(addr)),
-                    _ => Task::none(),
-                }
-            }
-            Message::MemoryViewAddrUpdate(addr) => {
-                self.show_memory_from_addr = addr;
-                Task::none()
-            }
-            _ => Task::none(),
+            Message::MemoryView(msg) => self.view_memory_state.update(msg).map(Message::MemoryView),
         }
     }
     pub fn view(&self) -> Element<Message> {
@@ -165,16 +154,22 @@ impl App {
         let io_registers = title_panel("IO REGISTERS", view_io_registers(&self.machine)).center_x(500);
 
         // let listings = view_listings(&self.machine);
-        let screen = title_panel("SCREEN", self.screen.view().map(move |msg| Message::Screen(msg))).center_x(162);
+        let screen = title_panel("SCREEN", self.screen.view().map(Message::Screen)).center_x(162);
 
-        let memory = title_panel("MEMORY", view_memory(&self, &self.machine))
-            .center_x(600)
-            .height(400);
+        let memory = title_panel(
+            "MEMORY",
+            view_memory::view(&self.view_memory_state, &self.machine).map(Message::MemoryView),
+        )
+        .center_x(460)
+        .height(370);
 
         let content = column![controls, row![cpu_state, io_registers, screen].spacing(10), memory]
             .spacing(10)
             .padding(10);
-        Element::from(content) //.explain(Color::from_rgb8(252, 15, 192))
+        Element::from(scrollable(content).direction(Direction::Both {
+            vertical: Scrollbar::default(),
+            horizontal: Scrollbar::default(),
+        })) //.explain(Color::from_rgb8(252, 15, 192))
     }
 }
 
@@ -414,95 +409,4 @@ fn view_io_registers<'a>(machine: &Machine) -> Element<'a, Message> {
     .spacing(6)
     .padding(4)
     .into()
-}
-fn view_memory<'a>(app: &App, machine: &Machine) -> Element<'a, Message> {
-    const SIZE: u16 = 12;
-
-    const ADDR_COUNT: usize = 16;
-
-    let update_view = || match u16::from_str_radix(&app.show_memory_from, 16) {
-        Ok(addr) if addr <= 0xFFF => Some(Message::MemoryViewAddrUpdate(addr)),
-        _ => None,
-    };
-    let controls = row![
-        text("show memory from: $"),
-        text_input("start", &app.show_memory_from)
-            .align_x(Horizontal::Right)
-            .width(60)
-            .on_input(Message::MemoryViewAddrStartChanged)
-            .on_submit_maybe(update_view()),
-        text("0"),
-        Space::with_width(8),
-        button("Update").on_press_maybe(update_view()).style(button::secondary),
-    ]
-    .align_y(Vertical::Center);
-
-    let header = row![
-        text("Address").size(SIZE).width(60),
-        text("00 01 02 03").size(SIZE),
-        text("04 05 06 07").size(SIZE),
-        text("08 09 0A 0B").size(SIZE),
-        text("0C 0D 0E 0F").size(SIZE),
-    ]
-    .spacing(10);
-
-    let mut grid = grid!();
-
-    let offset = app.show_memory_from_addr as usize;
-    debug!("offset: {offset:04X}");
-    let range: Vec<usize> = (offset..)
-        .take_while(|&x| x <= 0xFFF)
-        .map(|i| i * 0x10)
-        .take(ADDR_COUNT)
-        .collect();
-    debug!("range: {:?}", range);
-
-    for addr in range {
-        let addr = addr as u16;
-        grid = grid.push(grid_row!(
-            horizontal_space(),
-            text(format!("${addr:04X}")).size(SIZE).width(50),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr),
-                machine.bus.read_byte(addr + 0x1),
-                machine.bus.read_byte(addr + 0x2),
-                machine.bus.read_byte(addr + 0x3)
-            ))
-            .size(SIZE),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr + 0x4),
-                machine.bus.read_byte(addr + 0x5),
-                machine.bus.read_byte(addr + 0x6),
-                machine.bus.read_byte(addr + 0x7)
-            ))
-            .size(SIZE),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr + 0x8),
-                machine.bus.read_byte(addr + 0x9),
-                machine.bus.read_byte(addr + 0xA),
-                machine.bus.read_byte(addr + 0xB)
-            ))
-            .size(SIZE),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr + 0xC),
-                machine.bus.read_byte(addr + 0xD),
-                machine.bus.read_byte(addr + 0xE),
-                machine.bus.read_byte(addr + 0xF)
-            ))
-            .size(SIZE),
-        ));
-    }
-
-    grid = grid.column_spacing(10);
-
-    let scrollable = scrollable(grid)
-        .width(Fill)
-        .direction(scrollable::Direction::Vertical(Default::default()));
-    let content = container(column![header, scrollable]).width(Fill);
-
-    column![controls, content].into()
 }
