@@ -1,9 +1,8 @@
 use iced::mouse::Cursor;
-use iced::widget::canvas::{Cache, Geometry, Path, Program};
 use iced::widget::Canvas;
+use iced::widget::canvas::{Cache, Geometry, Path, Program};
 use iced::{Color, Element, Point, Size};
 use iced::{Rectangle, Renderer, Theme};
-
 
 pub struct Screen {
     cache: Cache,

@@ -12,11 +12,11 @@ pub struct ThemeColor {
 
 impl ThemeColor {
     pub const DEFAULT: Self = Self {
-        red: Color::from_rgb(255.0 / 255.0, 99.0 / 255.0, 71.0 / 255.0),
+        red: Color::from_rgb(1.0, 99.0 / 255.0, 71.0 / 255.0),
         green: Color::from_rgb(90.0 / 255.0, 206.0 / 255.0, 167.0 / 255.0),
         blue: Color::from_rgb(30.0 / 255.0, 144.0 / 255.0, 250.0 / 255.0),
         orange: Color::from_rgb(250.0 / 255.0, 150.0 / 255.0, 20.0 / 255.0),
-        yellow: Color::from_rgb(255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0),
+        yellow: Color::from_rgb(1.0, 215.0 / 255.0, 0.0 / 255.0),
         purple: Color::from_rgb(153.0 / 255.0, 50.0 / 255.0, 204.0 / 255.0),
         pink: Color::from_rgb(250.0 / 255.0, 20.0 / 255.0, 147.0 / 255.0),
     };

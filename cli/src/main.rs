@@ -154,12 +154,12 @@ impl App {
             HL: {:04X}  LY:  {:02X}\n\
             SP: {:04X}\n\
             PC: {:04X}\n\n",
-            self.fps, 
+            self.fps,
             self.machine.cpu().af(),
-            if self.machine.cpu().flag(CpuFlags::Z) {"Z"} else { "_"},
-            if self.machine.cpu().flag(CpuFlags::N) {"N"} else { "_"},
-            if self.machine.cpu().flag(CpuFlags::H) {"H"} else { "_"},
-            if self.machine.cpu().flag(CpuFlags::C) {"C"} else { "_"},
+            if self.machine.cpu().flag(CpuFlags::Z) { "Z" } else { "_" },
+            if self.machine.cpu().flag(CpuFlags::N) { "N" } else { "_" },
+            if self.machine.cpu().flag(CpuFlags::H) { "H" } else { "_" },
+            if self.machine.cpu().flag(CpuFlags::C) { "C" } else { "_" },
             self.machine.cpu().bc(),
             self.machine.bus.read_byte(0xFF40), // LCDC
             self.machine.cpu().de(),
@@ -170,8 +170,7 @@ impl App {
             self.machine.cpu().pc(),
         );
 
-        let debug_widget = Paragraph::new(debug_info)
-            .block(Block::bordered().title("Debug"));
+        let debug_widget = Paragraph::new(debug_info).block(Block::bordered().title("Debug"));
 
         frame.render_widget(debug_widget, debug_area);
 

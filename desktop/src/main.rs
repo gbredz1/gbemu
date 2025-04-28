@@ -1,5 +1,5 @@
 use crate::app::App;
-use iced::{window, Font, Point, Settings, Size};
+use iced::{Font, Point, Settings, Size, window};
 
 mod app;
 pub(crate) mod style;
@@ -14,7 +14,7 @@ fn main() -> iced::Result {
     iced::application(App::title, App::update, App::view)
         .subscription(App::subscription)
         .window(window::Settings {
-            size: Size::new(900.0, 500.0),
+            size: Size::new(900.0, 800.0),
             ..window::Settings::default()
         })
         .position(window::Position::Specific(Point::new(1000.0, 30.0)))

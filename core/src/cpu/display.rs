@@ -1,9 +1,9 @@
-use crate::cpu::addressing_mode::{AddressingMode, Register, CC};
+use crate::cpu::addressing_mode::{AddressingMode, CC, Register};
 use crate::cpu::instruction::Operation;
-use std::fmt;
-use std::fmt::{Display, Formatter};
 use AddressingMode::*;
 use Operation::*;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 impl Display for Operation {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

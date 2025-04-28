@@ -1,4 +1,3 @@
 use crate::bus::InterruptBus;
 
-pub trait CpuBus: InterruptBus {
-}
+pub trait CpuBus: InterruptBus {}

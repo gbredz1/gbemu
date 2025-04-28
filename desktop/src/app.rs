@@ -1,16 +1,18 @@
 use crate::style;
-use crate::style::container::panel_content;
 use crate::style::text::{reg_flag, reg8};
 use crate::theme::color;
-use crate::widgets::screen;
 use crate::widgets::screen::Screen;
+use crate::widgets::{screen, title_panel};
 use gbrust_core::{Cpu, CpuFlags, Machine};
 use iced::alignment::{Horizontal, Vertical};
-use iced::widget::{Column, Container, Row, Space, Text, button, column, container, row, scrollable, text, text_input};
-use iced::{Color, Element, Fill, Length, Subscription, time};
+use iced::keyboard::key::Named;
+use iced::widget::{
+    Column, Row, Space, button, column, container, horizontal_space, row, scrollable, text, text_input,
+};
+use iced::{Color, Element, Fill, Length, Subscription, Task, keyboard, time, window};
+use iced_aw::{grid, grid_row};
 use log::debug;
 use std::time::{Duration, Instant};
-use style::container::*;
 use style::text::*;
 
 pub(crate) struct App {
@@ -18,18 +20,23 @@ pub(crate) struct App {
     last_update: Option<Instant>,
     is_running: bool,
     screen: Screen,
-    step_over_to_content: String,
+    breakpoint_at: String,
+    show_memory_from: String,
+    show_memory_from_addr: u16,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Tick(Instant),
     TogglePlayback,
-    StepOver,
+    Step,
     Reset,
-    StepOverTo(u16),
-    StepOverToInputChanged(String),
+    StepToAddr(u16),
+    StepToAddrInputChanged(String),
     Screen(screen::Message),
+    CloseWindow,
+    MemoryViewAddrStartChanged(String),
+    MemoryViewAddrUpdate(u16),
 }
 
 impl Default for App {
@@ -44,7 +51,9 @@ impl Default for App {
             machine: device,
             last_update: None,
             is_running: false,
-            step_over_to_content: "021D".into(),
+            breakpoint_at: "021D".into(),
+            show_memory_from: "000".into(),
+            show_memory_from_addr: 0x000,
             screen: Screen::new(),
         }
     }
@@ -54,17 +63,24 @@ impl App {
     pub fn title(&self) -> String {
         String::from("My App")
     }
-
     pub fn subscription(&self) -> Subscription<Message> {
-        if self.is_running {
-            time::every(Duration::from_millis(17)).map(|_| Message::Tick(Instant::now()))
-        } else {
-            Subscription::none()
-        }
-    }
+        let tick = match self.is_running {
+            true => time::every(Duration::from_millis(17)).map(Message::Tick),
+            false => Subscription::none(),
+        };
+        let keyboard = keyboard::on_key_press(|key, _modifiers| match key.as_ref() {
+            keyboard::Key::Named(Named::F7) => Some(Message::Step),
+            keyboard::Key::Character("r") => Some(Message::Reset),
+            keyboard::Key::Named(Named::Space) => Some(Message::TogglePlayback),
+            keyboard::Key::Named(Named::Escape) => Some(Message::CloseWindow),
+            _ => None,
+        });
 
-    pub fn update(&mut self, message: Message) {
+        Subscription::batch(vec![tick, keyboard])
+    }
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::CloseWindow => window::get_latest().and_then(window::close),
             Message::Tick(now) => {
                 let last_update = self.last_update.unwrap_or(now);
                 let _delta = now - last_update;
@@ -72,11 +88,11 @@ impl App {
 
                 // self.machine.update(&delta).expect("Failed to update machine");
 
-                // if vblank occured or simple 60Hz update
+                // if vblank occurred or simple 60Hz update
                 let frame_buffer = self.machine.frame().clone();
                 self.update(Message::Screen(screen::Message::UpdateFrameBuffer(frame_buffer)))
             }
-            Message::StepOver => {
+            Message::Step => {
                 self.is_running = false;
 
                 self.machine.step().expect("Failed to step");
@@ -84,8 +100,10 @@ impl App {
                 // if vblank occured or simple 60Hz update
                 // let frame_buffer = self.machine.frame().clone();
                 // self.update(Message::Screen(screen::Message::UpdateFrameBuffer(frame_buffer)))
+
+                Task::none()
             }
-            Message::StepOverTo(addr) => {
+            Message::StepToAddr(addr) => {
                 self.is_running = false;
                 debug!("Step over to: {:04X}", addr);
 
@@ -95,9 +113,13 @@ impl App {
                         break;
                     }
                 }
+
+                Task::none()
             }
-            Message::StepOverToInputChanged(content) => {
-                self.step_over_to_content = content;
+            Message::StepToAddrInputChanged(content) => {
+                self.breakpoint_at = content;
+
+                Task::none()
             }
 
             Message::TogglePlayback => {
@@ -105,15 +127,35 @@ impl App {
                 if !self.is_running {
                     self.last_update = None;
                 }
+
+                Task::none()
             }
             Message::Reset => {
                 self.machine.reset();
                 self.screen.clear();
+
+                Task::none()
             }
 
             Message::Screen(msg) => {
                 self.screen.update(msg);
+
+                Task::none()
             }
+
+            Message::MemoryViewAddrStartChanged(addr) => {
+                self.show_memory_from = addr;
+
+                match u16::from_str_radix(&self.show_memory_from, 16) {
+                    Ok(addr) if addr <= 0xFFF => self.update(Message::MemoryViewAddrUpdate(addr)),
+                    _ => Task::none(),
+                }
+            }
+            Message::MemoryViewAddrUpdate(addr) => {
+                self.show_memory_from_addr = addr;
+                Task::none()
+            }
+            _ => Task::none(),
         }
     }
     pub fn view(&self) -> Element<Message> {
@@ -125,7 +167,13 @@ impl App {
         // let listings = view_listings(&self.machine);
         let screen = title_panel("SCREEN", self.screen.view().map(move |msg| Message::Screen(msg))).center_x(162);
 
-        let content = column![controls, row![cpu_state, io_registers, screen].spacing(10)].spacing(10);
+        let memory = title_panel("MEMORY", view_memory(&self, &self.machine))
+            .center_x(600)
+            .height(400);
+
+        let content = column![controls, row![cpu_state, io_registers, screen].spacing(10), memory]
+            .spacing(10)
+            .padding(10);
         Element::from(content) //.explain(Color::from_rgb8(252, 15, 192))
     }
 }
@@ -134,23 +182,29 @@ fn view_control<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
     let run_button = button(if is_running { "Pause" } else { "Play" })
         .on_press(Message::TogglePlayback)
         .style(button::primary);
-    let step_button = button("Step over").on_press(Message::StepOver).style(button::secondary);
-    let reset_button = button("Reset").on_press(Message::Reset).style(button::secondary);
+    let step_button = button("Step(F7)").on_press(Message::Step).style(button::secondary);
+    let reset_button = button("Reset(R)").on_press(Message::Reset).style(button::secondary);
 
-    let step_over_to = u16::from_str_radix(&app.step_over_to_content, 16)
-        .map(|addr| Message::StepOverTo(addr))
-        .ok();
-    let step_over_to = row![
-        text("Step over to: $"),
-        text_input("Addr", &app.step_over_to_content)
+    let breakpoint_u16 = || {
+        u16::from_str_radix(&app.breakpoint_at.as_str(), 16)
+            .map(|addr| Message::StepToAddr(addr))
+            .ok()
+    };
+
+    let step_to = row![
+        text("Breakpoint at: $"),
+        text_input("Breakpoint", &app.breakpoint_at)
             .width(60)
-            .on_input(Message::StepOverToInputChanged)
-            .on_submit_maybe(step_over_to.clone()),
-        button("Go").on_press_maybe(step_over_to).style(button::secondary),
+            .on_input(Message::StepToAddrInputChanged)
+            .on_submit_maybe(breakpoint_u16()),
+        button("Go").on_press_maybe(breakpoint_u16()).style(button::secondary),
     ]
     .align_y(Vertical::Center);
 
-    column![row![run_button, step_button, reset_button], step_over_to].into()
+    row![run_button, step_button, reset_button, step_to]
+        .spacing(8)
+        .align_y(Vertical::Center)
+        .into()
 }
 
 fn view_cpu_state<'a>(cpu: &Cpu) -> Element<'a, Message> {
@@ -226,7 +280,7 @@ fn view_listings<'a>(machine: &Machine) -> Element<'a, Message> {
     const TEXT_SIZE: u16 = 14;
     let instr_row = |addr: u16| -> Element<'a, Message> {
         let mut items: Vec<Element<'a, Message>> = vec![
-            text(format!("${:04X}", addr))
+            text(format!("${addr:04X}"))
                 .color(Color::from_rgb8(255, 211, 0))
                 .size(TEXT_SIZE)
                 .into(),
@@ -361,10 +415,94 @@ fn view_io_registers<'a>(machine: &Machine) -> Element<'a, Message> {
     .padding(4)
     .into()
 }
+fn view_memory<'a>(app: &App, machine: &Machine) -> Element<'a, Message> {
+    const SIZE: u16 = 12;
 
-fn title_panel<'a>(name: &'a str, content: Element<'a, Message>) -> Container<'a, Message> {
-    container(
-        column![container(text(name).center().width(Fill)).style(panel_title), content,].align_x(Horizontal::Center),
-    )
-    .style(panel_content)
+    const ADDR_COUNT: usize = 16;
+
+    let update_view = || match u16::from_str_radix(&app.show_memory_from, 16) {
+        Ok(addr) if addr <= 0xFFF => Some(Message::MemoryViewAddrUpdate(addr)),
+        _ => None,
+    };
+    let controls = row![
+        text("show memory from: $"),
+        text_input("start", &app.show_memory_from)
+            .align_x(Horizontal::Right)
+            .width(60)
+            .on_input(Message::MemoryViewAddrStartChanged)
+            .on_submit_maybe(update_view()),
+        text("0"),
+        Space::with_width(8),
+        button("Update").on_press_maybe(update_view()).style(button::secondary),
+    ]
+    .align_y(Vertical::Center);
+
+    let header = row![
+        text("Address").size(SIZE).width(60),
+        text("00 01 02 03").size(SIZE),
+        text("04 05 06 07").size(SIZE),
+        text("08 09 0A 0B").size(SIZE),
+        text("0C 0D 0E 0F").size(SIZE),
+    ]
+    .spacing(10);
+
+    let mut grid = grid!();
+
+    let offset = app.show_memory_from_addr as usize;
+    debug!("offset: {offset:04X}");
+    let range: Vec<usize> = (offset..)
+        .take_while(|&x| x <= 0xFFF)
+        .map(|i| i * 0x10)
+        .take(ADDR_COUNT)
+        .collect();
+    debug!("range: {:?}", range);
+
+    for addr in range {
+        let addr = addr as u16;
+        grid = grid.push(grid_row!(
+            horizontal_space(),
+            text(format!("${addr:04X}")).size(SIZE).width(50),
+            text(format!(
+                "{:02x} {:02x} {:02x} {:02x}",
+                machine.bus.read_byte(addr),
+                machine.bus.read_byte(addr + 0x1),
+                machine.bus.read_byte(addr + 0x2),
+                machine.bus.read_byte(addr + 0x3)
+            ))
+            .size(SIZE),
+            text(format!(
+                "{:02x} {:02x} {:02x} {:02x}",
+                machine.bus.read_byte(addr + 0x4),
+                machine.bus.read_byte(addr + 0x5),
+                machine.bus.read_byte(addr + 0x6),
+                machine.bus.read_byte(addr + 0x7)
+            ))
+            .size(SIZE),
+            text(format!(
+                "{:02x} {:02x} {:02x} {:02x}",
+                machine.bus.read_byte(addr + 0x8),
+                machine.bus.read_byte(addr + 0x9),
+                machine.bus.read_byte(addr + 0xA),
+                machine.bus.read_byte(addr + 0xB)
+            ))
+            .size(SIZE),
+            text(format!(
+                "{:02x} {:02x} {:02x} {:02x}",
+                machine.bus.read_byte(addr + 0xC),
+                machine.bus.read_byte(addr + 0xD),
+                machine.bus.read_byte(addr + 0xE),
+                machine.bus.read_byte(addr + 0xF)
+            ))
+            .size(SIZE),
+        ));
+    }
+
+    grid = grid.column_spacing(10);
+
+    let scrollable = scrollable(grid)
+        .width(Fill)
+        .direction(scrollable::Direction::Vertical(Default::default()));
+    let content = container(column![header, scrollable]).width(Fill);
+
+    column![controls, content].into()
 }
