@@ -1,8 +1,8 @@
 use gbrust_core::Machine;
 
-use crate::theme::color::{green, orange, purple};
+use crate::theme::color::{green, orange, pink, purple, yellow};
 use iced::alignment::{Horizontal, Vertical};
-use iced::widget::{button, column, container, horizontal_space, row, text, text_input};
+use iced::widget::{Row, Space, button, column, container, horizontal_space, row, text, text_input};
 use iced::{Element, Fill, Task};
 use iced_aw::{grid, grid_row};
 
@@ -82,8 +82,49 @@ impl State {
     }
 }
 
+macro_rules! memory_row {
+    ($f:expr,
+        $v0:expr, $v1:expr, $v2:expr, $v3:expr,
+        $v4:expr, $v5:expr, $v6:expr, $v7:expr) => {
+        row![
+            $f($v0),
+            Space::with_width(SPACE_BYTE),
+            $f($v1),
+            Space::with_width(SPACE_BYTE),
+            $f($v2),
+            Space::with_width(SPACE_BYTE),
+            $f($v3),
+            Space::with_width(SPACE_BYTE_4),
+            $f($v4),
+            Space::with_width(SPACE_BYTE),
+            $f($v5),
+            Space::with_width(SPACE_BYTE),
+            $f($v6),
+            Space::with_width(SPACE_BYTE),
+            $f($v7),
+        ]
+    };
+}
+macro_rules! memory_row_addr {
+    ($f:expr, $addr:expr) => {
+        memory_row!(
+            $f,
+            $addr + 0,
+            $addr + 1,
+            $addr + 2,
+            $addr + 3,
+            $addr + 4,
+            $addr + 5,
+            $addr + 6,
+            $addr + 7
+        )
+    };
+}
+
 pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
     const SIZE: u16 = 12;
+    const SPACE_BYTE: u16 = 4; // macro
+    const SPACE_BYTE_4: u16 = 7; // macro
 
     const ADDR_COUNT: usize = 16;
 
@@ -127,15 +168,43 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
             .on_input(Message::InputChanged),
         button_increment,
         button_increment10,
+        horizontal_space(),
+        row![
+            button(text("SP").size(SIZE).color(pink()))
+                .style(button::text)
+                .on_press(Message::InputChanged(format!("{:03X}", machine.cpu().sp() / 0x10))),
+            button(text("PC").size(SIZE).color(purple()))
+                .style(button::text)
+                .on_press(Message::InputChanged(format!("{:03X}", machine.cpu().pc() / 0x10))),
+            button(text("HL").size(SIZE).color(yellow()))
+                .style(button::text)
+                .on_press(Message::InputChanged(format!("{:03X}", machine.cpu().hl() / 0x10))),
+            Row::from_vec(
+                [
+                    MemorySectors::RomBank0,
+                    MemorySectors::RomBank1,
+                    MemorySectors::VideoRam
+                ]
+                .iter()
+                .map(|sector| {
+                    button(text(sector.name()).size(SIZE))
+                        .style(button::text)
+                        .on_press(Message::InputChanged(sector.addr().into()))
+                        .into()
+                })
+                .collect()
+            ),
+        ],
+        horizontal_space(),
     ]
     .align_y(Vertical::Center);
 
+    let mem_header = |value: &'a str| text(value).size(SIZE).color(green());
+
     let header = row![
         text("Address").size(SIZE).width(60).color(purple()),
-        text("00 01 02 03").color(green()).size(SIZE),
-        text("04 05 06 07").color(green()).size(SIZE),
-        text("08 09 0A 0B").color(green()).size(SIZE),
-        text("0C 0D 0E 0F").color(green()).size(SIZE),
+        memory_row!(mem_header, "00", "01", "02", "03", "04", "05", "06", "07"),
+        memory_row!(mem_header, "08", "09", "0A", "0B", "0C", "0D", "0E", "0F"),
     ]
     .spacing(10);
 
@@ -148,43 +217,34 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
         .take(ADDR_COUNT)
         .collect();
 
+    let mem_byte = |addr: u16| {
+        let value = machine.bus.read_byte(addr);
+
+        let t = text(format!("{value:02x}")).size(SIZE);
+        match addr {
+            addr if addr == machine.cpu().sp() => t.color(pink()),
+            addr if addr == machine.cpu().pc() => t.color(purple()),
+            addr if addr == machine.cpu().hl() => t.color(yellow()),
+            _ => t,
+        }
+    };
+
+    let mem_ascii = |addr: u16| -> Element<'a, Message> {
+        let value = match machine.bus.read_byte(addr) {
+            val if (0x20..=0x7E).contains(&val) => val as char,
+            _ => '.',
+        };
+        text(format!("{value}")).size(SIZE).into()
+    };
+
     for addr in range {
         let addr = addr as u16;
         grid = grid.push(grid_row!(
             horizontal_space(),
             text(format!("${addr:04X}")).size(SIZE).width(50).color(orange()),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr),
-                machine.bus.read_byte(addr + 0x1),
-                machine.bus.read_byte(addr + 0x2),
-                machine.bus.read_byte(addr + 0x3)
-            ))
-            .size(SIZE),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr + 0x4),
-                machine.bus.read_byte(addr + 0x5),
-                machine.bus.read_byte(addr + 0x6),
-                machine.bus.read_byte(addr + 0x7)
-            ))
-            .size(SIZE),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr + 0x8),
-                machine.bus.read_byte(addr + 0x9),
-                machine.bus.read_byte(addr + 0xA),
-                machine.bus.read_byte(addr + 0xB)
-            ))
-            .size(SIZE),
-            text(format!(
-                "{:02x} {:02x} {:02x} {:02x}",
-                machine.bus.read_byte(addr + 0xC),
-                machine.bus.read_byte(addr + 0xD),
-                machine.bus.read_byte(addr + 0xE),
-                machine.bus.read_byte(addr + 0xF)
-            ))
-            .size(SIZE),
+            memory_row_addr!(mem_byte, addr),
+            memory_row_addr!(mem_byte, addr + 8),
+            Row::from_vec((0..=16).map(|i| mem_ascii(addr.wrapping_add(i))).collect()),
         ));
     }
 
@@ -193,4 +253,53 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
     let content = container(column![header, grid]).width(Fill);
 
     column![controls, content].spacing(10).padding(8).into()
+}
+
+
+#[allow(dead_code)]
+enum MemorySectors {
+    RomBank0,
+    RomBank1,
+    VideoRam,
+    ExternalRam,
+    WorkRam0,
+    WorkRamN,
+    EchoRam,
+    Oam,
+    Unusable,
+    IORegister,
+    HighRam,
+}
+
+impl MemorySectors {
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            MemorySectors::RomBank0 => "ROM0",
+            MemorySectors::RomBank1 => "ROM1",
+            MemorySectors::VideoRam => "VRAM",
+            MemorySectors::ExternalRam => "SRAM",
+            MemorySectors::WorkRam0 => "WRA0",
+            MemorySectors::WorkRamN => "WRAN",
+            MemorySectors::EchoRam => "ECHO",
+            MemorySectors::Oam => "OAM",
+            MemorySectors::Unusable => "---",
+            MemorySectors::IORegister => "I/O",
+            MemorySectors::HighRam => "HRAM",
+        }
+    }
+    fn addr(&self) -> &'static str {
+        match self {
+            MemorySectors::RomBank0 => "000",
+            MemorySectors::RomBank1 => "400",
+            MemorySectors::VideoRam => "800",
+            MemorySectors::ExternalRam => "A00",
+            MemorySectors::WorkRam0 => "CFF",
+            MemorySectors::WorkRamN => "DFF",
+            MemorySectors::EchoRam => "E00",
+            MemorySectors::Oam => "FE0",
+            MemorySectors::Unusable => "FEA",
+            MemorySectors::IORegister => "FF0",
+            MemorySectors::HighRam => "FF8",
+        }
+    }
 }
