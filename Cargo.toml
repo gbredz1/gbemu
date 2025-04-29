@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["cli", "core", "desktop"]
+members = ["term", "core", "desktop"]
 
 [workspace.package]
 publish = false

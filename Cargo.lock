@@ -1423,17 +1423,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gbrust-cli"
-version = "0.1.0"
-dependencies = [
- "crossterm 0.29.0",
- "dotenv",
- "env_logger",
- "gbrust-core",
- "ratatui",
-]
-
-[[package]]
 name = "gbrust-core"
 version = "0.1.0"
 dependencies = [
@@ -1452,6 +1441,17 @@ dependencies = [
  "iced",
  "iced_aw",
  "log",
+]
+
+[[package]]
+name = "gbrust-term"
+version = "0.1.0"
+dependencies = [
+ "crossterm 0.29.0",
+ "dotenv",
+ "env_logger",
+ "gbrust-core",
+ "ratatui",
 ]
 
 [[package]]
