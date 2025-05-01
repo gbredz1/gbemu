@@ -69,6 +69,39 @@ impl Ppu {
         }
     }
 
+    #[cfg(debug_assertions)]
+    pub fn update_test(&mut self, bus: &mut impl PpuBus, cycles: u32) {
+        // Check if the LCD screen is enabled
+        if bus.lcdc().bits() & 0x80 == 0 {
+            return; // LCD disabled, do nothing
+        }
+
+        // For the simplified version, fill the buffer with a test pattern.
+        self.render_test_pattern(bus);
+    }
+
+    // Function to display a simple test pattern
+    #[cfg(debug_assertions)]
+    fn render_test_pattern(&mut self, bus: &impl PpuBus) {
+        for y in 0..144 {
+            for x in 0..160 {
+                // Checkerboard pattern for testing
+                let color = if (x / 8 + y / 8) % 2 == 0 { 3 } else { 1 };
+                self.frame_buffer[y * 160 + x] = color;
+            }
+        }
+
+        // border 1 px
+        for x in 0..160 {
+            self.frame_buffer[x] = 0; // Haut
+            self.frame_buffer[143 * 160 + x] = 0; // Bas
+        }
+        for y in 0..144 {
+            self.frame_buffer[y * 160] = 0; // Gauche
+            self.frame_buffer[y * 160 + 159] = 0; // Droite
+        }
+    }
+
     /// H-Blank mode
     fn handle_mode0(&mut self, bus: &mut impl PpuBus) {
         if self.mode_clock < 204 {
@@ -127,43 +160,43 @@ impl Ppu {
         }
         self.mode_clock = 0;
 
-        // Collecte des sprites visibles sur la ligne actuelle
+        // Collecting visible sprites on the current line
         let current_line = bus.ly();
         let mut visible_sprites = Vec::with_capacity(10); // Max 10 sprites per line
 
-        // Parcourir les 40 sprites dans l'OAM
+        // Iterate through the 40 sprites in the OAM
         for sprite_idx in 0..40 {
-            // Lire les données du sprite depuis l'OAM
+            // Read the sprite data from the OAM
             let sprite_y = bus.read_oam(sprite_idx * 4);
             let sprite_x = bus.read_oam(sprite_idx * 4 + 1);
             let tile_idx = bus.read_oam(sprite_idx * 4 + 2);
             let attributes = bus.read_oam(sprite_idx * 4 + 3);
 
-            // Déterminer la hauteur du sprite (8x8 ou 8x16)
+            // Determine the height of the sprite (8x8 or 8x16)
             let sprite_height = if bus.lcdc().contains(LcdControl::OBJ_SIZE) {
                 16
             } else {
                 8
             };
 
-            // Vérifier si le sprite est visible sur la ligne actuelle
-            // Position Y est décalée de 16 pixels dans les spécifications GameBoy
+            // Check if the sprite is visible on the current line.
+            // Y Position is offset by 16 pixels in the GameBoy specifications
             let sprite_line = current_line as i32 - (sprite_y as i32 - 16);
             if sprite_line >= 0 && sprite_line < sprite_height as i32 {
-                // Le sprite est visible sur cette ligne
+                // The sprite is visible on this line.
                 visible_sprites.push((sprite_idx as u8, sprite_x, tile_idx, attributes));
 
-                // Limitation à 10 sprites par ligne comme sur le hardware
+                // Limited to 10 sprites per line, as on the hardware.
                 if visible_sprites.len() >= 10 {
                     break;
                 }
             }
         }
 
-        // Trier les sprites par priorité (position X, plus petit d'abord comme sur le hardware)
+        // Sort the sprites by priority (X position, smallest first as on the hardware)
         visible_sprites.sort_by_key(|&(_, x, _, _)| x);
 
-        // Stocker les sprites pour utilisation dans le mode 3 (Pixel Transfer)
+        // Store sprites for use in mode 3 (Pixel Transfer)
         self.current_line_sprites = visible_sprites;
 
         // After OAM scan is complete, switch to Pixel Transfer mode

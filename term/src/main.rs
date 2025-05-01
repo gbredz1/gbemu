@@ -22,7 +22,7 @@ fn main() -> io::Result<()> {
     let mut app = App::default();
     app.step_by_step = true;
     app.set_logs(logs);
-    app.load("roms/tetris.gb")?;
+    app.load("roms/test.gb")?;
 
     let mut terminal = ratatui::init();
     let app_result = app.run(&mut terminal);

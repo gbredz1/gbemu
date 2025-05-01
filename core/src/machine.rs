@@ -41,7 +41,7 @@ impl Machine {
 
     pub fn step(&mut self) -> Result<usize, Box<dyn Error>> {
         let cycles = self.cpu.step(&mut self.bus)?;
-        self.ppu.update(&mut self.bus, cycles as u32);
+        self.ppu.update_test(&mut self.bus, cycles as u32);
 
         Ok(cycles)
     }

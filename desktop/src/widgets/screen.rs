@@ -1,56 +1,48 @@
 use iced::mouse::Cursor;
-use iced::widget::Canvas;
-use iced::widget::canvas::{Cache, Geometry, Path, Program};
+use iced::widget::canvas;
+use iced::widget::canvas::Geometry;
 use iced::{Color, Element, Point, Size};
 use iced::{Rectangle, Renderer, Theme};
 
+#[derive(Default)]
 pub struct Screen {
-    cache: Cache,
-    frame_buffer: Vec<u8>,
+    cache: canvas::Cache,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    UpdateFrameBuffer(Vec<u8>),
+    UpdateFrameBuffer,
 }
 
 impl Screen {
-    const SCREEN_WIDTH: usize = 160;
-    const SCREEN_HEIGHT: usize = 144;
+    pub const WIDTH: usize = 160;
+    pub const HEIGHT: usize = 144;
 
-    pub fn new() -> Self {
-        Self {
-            cache: Cache::default(),
-            frame_buffer: vec![0; Self::SCREEN_WIDTH * Self::SCREEN_HEIGHT],
-        }
-    }
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::UpdateFrameBuffer(frame_buffer) => {
-                self.frame_buffer = frame_buffer;
-                self.cache.clear();
-            }
+            Message::UpdateFrameBuffer => self.clear(),
         }
     }
-    pub fn view(&self) -> Element<Message> {
-        Canvas::new(self).width(160).height(144).into()
+    pub fn view<'a>(&'a self, frame_buffer: &'a Vec<u8>) -> Element<'a, Message> {
+        canvas(ScreenCanvas {
+            cache: &self.cache,
+            frame_buffer,
+        })
+        .width(Self::WIDTH as u16)
+        .height(Self::HEIGHT as u16 + 1)
+        .into()
     }
 
     pub fn clear(&mut self) {
         self.cache.clear();
     }
-
-    fn color(val: u8) -> Color {
-        match val {
-            0 => Color::from_rgb8(155, 188, 15),
-            1 => Color::from_rgb8(139, 172, 15),
-            2 => Color::from_rgb8(48, 98, 48),
-            _ => Color::from_rgb8(15, 56, 15),
-        }
-    }
 }
 
-impl Program<Message> for Screen {
+struct ScreenCanvas<'a> {
+    cache: &'a canvas::Cache,
+    frame_buffer: &'a Vec<u8>,
+}
+impl<'a> canvas::Program<Message> for ScreenCanvas<'a> {
     type State = ();
 
     fn draw(
@@ -62,16 +54,27 @@ impl Program<Message> for Screen {
         _cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
         let draw = self.cache.draw(renderer, bounds.size(), |frame| {
-            let background = Path::rectangle(
+            let background = canvas::Path::rectangle(
                 Point::from([0f32, 0f32]),
-                Size::new(Self::SCREEN_WIDTH as f32, Self::SCREEN_HEIGHT as f32),
+                Size::new(Screen::WIDTH as f32, Screen::HEIGHT as f32),
             );
-            frame.fill(&background, Color::from_rgb8(0, 0, 0));
-            for x in 0..Self::SCREEN_WIDTH {
-                for y in 0..Self::SCREEN_HEIGHT {
+            frame.fill(&background, Color::from_rgb8(15, 56, 15));
+
+            for x in 0..Screen::WIDTH {
+                for y in 0..Screen::HEIGHT {
                     let point = Point::from([x as f32, y as f32]);
-                    let index = x + (Self::SCREEN_WIDTH * y);
-                    let color = Self::color(self.frame_buffer[index]);
+                    let index = x + (Screen::WIDTH * y);
+
+                    let color = self.frame_buffer[index];
+                    if color > 2 {
+                        continue;
+                    }
+                    let color = match color {
+                        0 => Color::from_rgb8(155, 188, 15),
+                        1 => Color::from_rgb8(139, 172, 15),
+                        2 => Color::from_rgb8(48, 98, 48),
+                        _ => Color::from_rgb8(15, 56, 15), // background color
+                    };
                     let size = Size::new(1.0, 1.0);
                     frame.fill_rectangle(point, size, color)
                 }
