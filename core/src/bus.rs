@@ -1,8 +1,6 @@
-//!
 use crate::cpu::CpuBus;
 use crate::ppu::PpuBus;
 use bitflags::bitflags;
-use log::trace;
 use std::default::Default;
 use std::fs::File;
 use std::io::Read;
@@ -64,6 +62,22 @@ macro_rules! define_u8_accessors {
     };
 }
 pub(crate) use define_u8_accessors;
+macro_rules! define_palette_accessors {
+ ($name:ident, $addr:expr) => {
+        fn $name(&self) -> u8 {
+            self.read_byte($addr)
+        }
+        paste::paste! {
+            fn [<$name:lower _color>](&self, color_id: u8) -> u8 {
+                self.$name() >> (color_id * 2) & 0x03
+            }
+            fn [<set_ $name>](&mut self, value: u8) {
+                self.write_byte($addr, value);
+            }
+        }
+    };
+}
+pub(crate) use define_palette_accessors;
 
 pub struct MemorySystem {
     memory: Vec<u8>,
@@ -73,10 +87,6 @@ impl MemorySystem {
     pub(crate) fn reset(&mut self) {
         // Clear VRAM
         self.memory[0x8000..=0x9fff].fill(0);
-
-        // Load the cartridge header logo tiles into VRAM starting at $8010
-        let (head, vram) = self.memory.split_at_mut(0x8000);
-        vram[0x10..=0x3F].copy_from_slice(&head[0x104..=0x133]);
     }
 }
 
@@ -104,7 +114,6 @@ impl MemorySystem {
     }
     #[inline(always)]
     pub fn write_byte(&mut self, address: u16, byte: u8) {
-        trace!("WRITE.B #{:04x}: {:02x}", address, byte);
         unsafe {
             *self.memory.get_unchecked_mut(address as usize) = byte;
         }
@@ -116,7 +125,6 @@ impl MemorySystem {
     }
 
     pub fn write_word(&mut self, address: u16, word: u16) {
-        trace!("WRITE.W #{:04x}: {:04x}", address, word);
         unsafe {
             *self.memory.get_unchecked_mut(address as usize) = word as u8; // LSB first
             *self.memory.get_unchecked_mut(address as usize + 1) = (word >> 8) as u8; // MSB second

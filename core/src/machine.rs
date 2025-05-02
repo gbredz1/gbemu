@@ -2,21 +2,17 @@ use crate::bus::{InterruptBus, MemorySystem};
 use crate::cpu::Cpu;
 use crate::ppu::Ppu;
 use std::error::Error;
-use std::time::Duration;
 
 #[derive(Default)]
 pub struct Machine {
     cpu: Cpu,
-    pub bus: MemorySystem,
+    bus: MemorySystem,
     ppu: Ppu,
 
-    // timing
-    accumulator: i64,
+    start_addr: Option<u16>,
 }
 
 impl Machine {
-    const CPU_STEP_NS: i64 = 238; // ~4194304 Hz
-
     pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
         self.bus.load_cartridge(path)
     }
@@ -27,21 +23,29 @@ impl Machine {
     pub fn cpu(&self) -> &Cpu {
         &self.cpu
     }
+    pub fn bus(&self) -> &MemorySystem {
+        &self.bus
+    }
 
-    pub fn update(&mut self, delta: &Duration) -> Result<(), Box<dyn Error>> {
-        self.accumulator += delta.as_nanos() as i64;
+    pub fn set_start_addr(&mut self, addr: u16) {
+        self.start_addr = Some(addr);
+    }
+    pub fn start_addr(&self) -> Option<u16> {
+        self.start_addr
+    }
 
-        while self.accumulator >= Self::CPU_STEP_NS {
-            let cycles = self.step()?;
-            self.accumulator -= Self::CPU_STEP_NS * cycles as i64;
+    pub fn step_frame(&mut self) -> Result<usize, Box<dyn Error>> {
+        let mut total_cycles = 0;
+        for _ in 0..70224 {
+            total_cycles += self.step()?;
         }
 
-        Ok(())
+        Ok(total_cycles)
     }
 
     pub fn step(&mut self) -> Result<usize, Box<dyn Error>> {
         let cycles = self.cpu.step(&mut self.bus)?;
-        self.ppu.update_test(&mut self.bus, cycles as u32);
+        self.ppu.update(&mut self.bus, cycles as u32);
 
         Ok(cycles)
     }
@@ -49,6 +53,9 @@ impl Machine {
     pub fn reset(&mut self) {
         self.bus.reset();
         self.cpu.reset();
+        if let Some(addr) = self.start_addr {
+            self.cpu.set_pc(addr);
+        }
         self.ppu.reset(&mut self.bus);
 
         self.bus.set_interrupt_enable_u8(0x00);

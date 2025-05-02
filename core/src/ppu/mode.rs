@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum Mode {
     HBlank = 0,        // 87-204 cycles
     VBlank = 1,        // 4560 cycles ( 10 lines x 456 cycles)

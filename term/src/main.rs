@@ -1,9 +1,9 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use gbrust_core::{CpuFlags, Machine};
-use ratatui::DefaultTerminal;
 use ratatui::prelude::*;
 use ratatui::widgets::canvas::{Canvas, Points};
 use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::DefaultTerminal;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -20,9 +20,9 @@ fn main() -> io::Result<()> {
         .init();
 
     let mut app = App::default();
-    app.step_by_step = true;
+    app.step_by_step = false;
     app.set_logs(logs);
-    app.load("roms/test.gb")?;
+    app.load("roms/bios.gb")?;
 
     let mut terminal = ratatui::init();
     let app_result = app.run(&mut terminal);
@@ -79,7 +79,7 @@ impl App {
         if self.step_by_step {
             self.machine.step().expect("Error while stepping machine");
         } else {
-            self.machine.update(delta).expect("Error while updating the machine");
+            self.machine.step_frame().expect("Error while updating the machine");
         }
 
         Ok(())
@@ -161,11 +161,11 @@ impl App {
             if self.machine.cpu().flag(CpuFlags::H) { "H" } else { "_" },
             if self.machine.cpu().flag(CpuFlags::C) { "C" } else { "_" },
             self.machine.cpu().bc(),
-            self.machine.bus.read_byte(0xFF40), // LCDC
+            self.machine.bus().read_byte(0xFF40), // LCDC
             self.machine.cpu().de(),
-            self.machine.bus.read_byte(0xFF41), // STAT
+            self.machine.bus().read_byte(0xFF41), // STAT
             self.machine.cpu().hl(),
-            self.machine.bus.read_byte(0xFF44), // LY
+            self.machine.bus().read_byte(0xFF44), // LY
             self.machine.cpu().sp(),
             self.machine.cpu().pc(),
         );

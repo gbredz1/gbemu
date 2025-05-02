@@ -161,7 +161,7 @@ impl LR35902Decoder {
                 (3, _, 1, p, 0) => instr!(POP(z_rp2!(p)), 1, 12),                          // POP rp2[p]
                 (3, _, 1, 0, 1) => instr!(RET, 1, 16),                                     // RET
                 (3, _, 1, 1, 1) => instr!(RETI, 1, 16),                                    // RETI
-                (3, _, 1, 2, 1) => instr!(JP(z!("(HL)")), 1, 4),                           // JP (HL)
+                (3, _, 1, 2, 1) => instr!(JP(z!("HL")), 1, 4),                             // JP (HL)
                 (3, _, 1, 3, 1) => instr!(LD(z!("SP"), z!("HL")), 1, 8),                   // LD SP,HL
                 (3, y, 2, _, _) if y < 4 => instr!(JPcc(z_cc!(y), z!("nn")), 3, 16, 12),   // JP cc[y],nn
                 (3, 4, 2, _, _) => instr!(LDH(z!("(C)"), z!("A")), 1, 8),                  // LDH (C),A

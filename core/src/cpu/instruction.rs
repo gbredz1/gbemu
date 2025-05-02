@@ -39,6 +39,8 @@ macro_rules! read_operand_value_u8 {
             }
             z!("(n)") => $bus.read_byte(0xFF00 | $data[0] as u16),
             z!("(C)") => $bus.read_byte(0xFF00 | $cpu.c() as u16),
+            z!("(DE)") => $bus.read_byte($cpu.de()),
+            z!("(BC)") => $bus.read_byte($cpu.bc()),
             z!("(nn)") => $bus.read_byte(read_u16_le!($data)),
             _ => {
                 debug!("Unsupported operand: {:?}", $op);
@@ -311,18 +313,48 @@ impl Instruction {
 
                 self.cycles
             }
-            ADD(z!("A"), op2) => {
-                let value = read_operand_value_u8!(cpu, bus, data, op2);
+            ADD(op1, op2) => {
+                match_size!(
+                    op1,
+                    {
+                        let val1 = read_operand_value_u8!(cpu, bus, data, op1);
+                        let val2 = read_operand_value_u8!(cpu, bus, data, op2);
+                        let (result, carry) = val1.overflowing_add(val2);
+                        write_to_operand_u8!(cpu, bus, data, op1, result);
 
-                let result = cpu.a().wrapping_add(value);
-                cpu.set_flag_if(Flags::Z, result == 0);
-                cpu.clear_flag(Flags::N);
-                cpu.set_flag_if(Flags::H, (cpu.a() & 0x0F) + (value & 0x0F) > 0x0F);
-                cpu.set_flag_if(Flags::C, cpu.a() as u16 + value as u16 > 0xFF);
-                cpu.set_a(result);
+                        cpu.set_flag_if(Flags::Z, result == 0);
+                        cpu.clear_flag(Flags::N);
+                        cpu.set_flag_if(Flags::C, carry);
+                        cpu.set_flag_if(Flags::H, (val1 & 0x0F) + (val2 & 0x0F) > 0x0F);
+                    },
+                    {
+                        // 16-bits
+                        let val1 = read_operand_value_u16!(cpu, bus, data, op1);
+
+                        if op2 == z!("e") {
+                            let val2 = read_operand_value_u8!(cpu, bus, data, op2) as i16;
+                            let (result, carry) = val1.overflowing_add_signed(val2);
+                            write_to_operand_u16!(cpu, bus, op1, result);
+
+                            cpu.clear_flag(Flags::Z);
+                            cpu.clear_flag(Flags::N);
+                            cpu.set_flag_if(Flags::H, (val1 & 0x0F) + (val2 as u16 & 0x0F) > 0x0F);
+                            cpu.set_flag_if(Flags::C, carry);
+                        } else {
+                            let val2 = read_operand_value_u16!(cpu, bus, data, op2);
+                            let (result, carry) = val1.overflowing_add(val2);
+                            write_to_operand_u16!(cpu, bus, op1, result);
+
+                            cpu.clear_flag(Flags::N);
+                            cpu.set_flag_if(Flags::H, (val1 & 0x0FFF) + (val2 & 0x0FFF) > 0x0FFF);
+                            cpu.set_flag_if(Flags::C, carry);
+                        }
+                    }
+                );
 
                 self.cycles
             }
+
             ADC(z!("A"), op2) => {
                 let carry = if cpu.flag(Flags::C) { 1 } else { 0 };
                 let val2 = cpu.a();
@@ -398,14 +430,24 @@ impl Instruction {
                 self.cycles
             }
             INC(op) => {
-                let value = read_operand_value_u8!(cpu, bus, data, op);
-                let result = value.wrapping_add(1);
-                write_to_operand_u8!(cpu, bus, data, op, result);
+                match_size!(
+                    op,
+                    {
+                        let value = read_operand_value_u8!(cpu, bus, data, op);
+                        let result = value.wrapping_add(1);
+                        write_to_operand_u8!(cpu, bus, data, op, result);
 
-                cpu.set_flag_if(Flags::Z, result == 0);
-                cpu.clear_flag(Flags::N);
-                cpu.set_flag_if(Flags::H, (value & 0x0F) == 0xF);
-                cpu.clear_flag(Flags::C);
+                        cpu.set_flag_if(Flags::Z, result == 0);
+                        cpu.clear_flag(Flags::N);
+                        cpu.set_flag_if(Flags::H, (value & 0x0F) == 0xF);
+                        cpu.clear_flag(Flags::C);
+                    },
+                    {
+                        let value = read_operand_value_u16!(cpu, bus, data, op);
+                        let result = value.wrapping_add(1);
+                        write_to_operand_u16!(cpu, bus, op, result);
+                    }
+                );
 
                 self.cycles
             }
@@ -425,6 +467,47 @@ impl Instruction {
                 cpu.set_a(0xFF ^ cpu.a());
                 cpu.set_flag(Flags::N);
                 cpu.set_flag(Flags::H);
+
+                self.cycles
+            }
+
+            RLA => {
+                let val = cpu.a();
+                let result = val.rotate_left(1) | cpu.flag(Flags::C) as u8;
+                cpu.set_a(result);
+
+                cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+
+                self.cycles
+            }
+            RRA => {
+                let val = cpu.a();
+                let result = val.rotate_right(1) | (cpu.flag(Flags::C) as u8) << 7;
+                cpu.set_a(result);
+
+                cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+
+                self.cycles
+            }
+            RLCA => {
+                let val = cpu.a();
+                let result = val.rotate_left(1);
+                cpu.set_a(result);
+
+                cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+
+                self.cycles
+            }
+            RRCA => {
+                let val = cpu.a();
+                let result = val.rotate_right(1);
+                cpu.set_a(result);
+
+                cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
 
                 self.cycles
             }
@@ -488,8 +571,110 @@ impl Instruction {
 
                 self.cycles
             }
+            BIT(n, op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val & (1 << n);
+                write_to_operand_u8!(cpu, bus, data, op, result);
 
-            _ => todo!("not implemented: {} (CBPrefix)", self.operation),
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N);
+                cpu.set_flag(Flags::H);
+
+                self.cycles
+            }
+            RES(n, op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val & !(1 << n);
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                self.cycles
+            }
+            SET(n, op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val | (1 << n);
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                self.cycles
+            }
+            RLC(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val.rotate_left(1);
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+
+                self.cycles
+            }
+            RRC(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val.rotate_right(1);
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+
+                self.cycles
+            }
+            RL(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val << 1 | cpu.flag(Flags::C) as u8;
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+
+                self.cycles
+            }
+            RR(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val >> 1 | (cpu.flag(Flags::C) as u8) << 7;
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+
+                self.cycles
+            }
+            SLA(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val << 1;
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+
+                self.cycles
+            }
+            SRA(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val >> 1 | (val & 0x01) << 7;
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+
+                self.cycles
+            }
+            SRL(op) => {
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let result = val >> 1;
+                write_to_operand_u8!(cpu, bus, data, op, result);
+
+                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+
+                self.cycles
+            }
+
+            _ => unimplemented!("not implemented: {} (CBPrefix)", self.operation),
         }
     }
 }

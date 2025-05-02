@@ -218,7 +218,7 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
         .collect();
 
     let mem_byte = |addr: u16| {
-        let value = machine.bus.read_byte(addr);
+        let value = machine.bus().read_byte(addr);
 
         let t = text(format!("{value:02x}")).size(SIZE);
         match addr {
@@ -230,7 +230,7 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
     };
 
     let mem_ascii = |addr: u16| -> Element<'a, Message> {
-        let value = match machine.bus.read_byte(addr) {
+        let value = match machine.bus().read_byte(addr) {
             val if (0x20..=0xFE).contains(&val) => val as char,
             _ => '.',
         };

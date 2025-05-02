@@ -3,3 +3,6 @@
 .idea/
 .vscode/
 .env
+
+flamegraph*
+perf.data*

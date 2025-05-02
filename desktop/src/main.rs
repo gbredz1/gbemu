@@ -12,6 +12,7 @@ fn main() -> iced::Result {
     env_logger::builder().format_timestamp_nanos().init();
 
     iced::application(App::title, App::update, App::view)
+        .antialiasing(false)
         .subscription(App::subscription)
         .window(window::Settings {
             size: Size::new(910.0, 830.0),

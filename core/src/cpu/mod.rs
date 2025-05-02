@@ -6,7 +6,6 @@ use crate::cpu::addressing_mode::CC;
 pub(crate) use crate::cpu::cpu_bus::CpuBus;
 use crate::cpu::register::Register16;
 use bitflags::bitflags;
-use log::trace;
 
 mod decoder;
 mod instruction;
@@ -71,7 +70,6 @@ impl Cpu {
             self.ime_scheduled = false;
         }
 
-        let opcode_addr = self.pc;
         let opcode = self.pc_read_byte(bus);
 
         let instruction = cpu_decode!(opcode);
@@ -86,25 +84,6 @@ impl Cpu {
         for _ in 1..instruction.size {
             data.push(self.pc_read_byte(bus));
         }
-
-        let opcode_debug = format!(
-            "${:04X} > {:02X}{:<20}; {}",
-            opcode_addr,
-            opcode,
-            if !data.is_empty() {
-                format!(
-                    " {}",
-                    data.iter()
-                        .map(|b| format!("{b:02X}"))
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                )
-            } else {
-                String::new()
-            },
-            instruction.operation,
-        );
-        trace!("{opcode_debug}");
 
         Ok(instruction.execute(self, bus, data))
     }
@@ -135,22 +114,10 @@ impl Cpu {
         byte
     }
     fn sp_push_word(&mut self, bus: &mut impl CpuBus, value: u16) {
-        // bus.write_byte(self.sp, (value >> 8) as u8);
-        // self.sp = self.sp.wrapping_sub(1);
-        // bus.write_byte(self.sp, value as u8);
-        // self.sp = self.sp.wrapping_sub(1);
-
         self.sp = self.sp.wrapping_sub(2);
         bus.write_word(self.sp, value);
     }
     fn sp_pop_word(&mut self, bus: &mut impl CpuBus) -> u16 {
-        // let high = bus.read_byte(self.sp) as u16;
-        // self.sp = self.sp.wrapping_add(1);
-        // let low = bus.read_byte(self.sp) as u16;
-        // self.sp = self.sp.wrapping_add(1);
-        //
-        // high << 8 | low
-
         let value = bus.read_word(self.sp);
         self.sp = self.sp.wrapping_add(2);
         value
