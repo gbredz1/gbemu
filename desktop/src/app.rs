@@ -14,7 +14,6 @@ pub(crate) struct App {
     last_update: Option<Instant>,
     is_running: bool,
     breakpoint_at: String,
-    breakpoint_at_addr: Option<u16>,
 
     view_memory_state: view_memory::State,
     screen: Screen,
@@ -51,7 +50,6 @@ impl Default for App {
             view_memory_state: view_memory::State::default(),
             screen: Screen::default(),
             total_cycles: 0,
-            breakpoint_at_addr: None,
         }
     }
 }
@@ -81,9 +79,9 @@ impl App {
         match message {
             Message::CloseWindow => window::get_latest().and_then(window::close),
             Message::Tick(_now) => {
-                self.total_cycles += self.machine.step_frame().expect("Failed to update the machine") as u64;
-
-                if self.breakpoint_at_addr == Some(self.machine.cpu().pc()) {
+                let (cycles, break_flag) = self.machine.step_frame().expect("Failed to update the machine");
+                self.total_cycles += cycles as u64;
+                if break_flag {
                     self.is_running = false;
                 }
 
@@ -98,13 +96,13 @@ impl App {
             }
             Message::StepToAddr(addr) => {
                 self.is_running = true;
-                self.breakpoint_at_addr = Some(addr);
+                self.machine.set_breakpoint(addr);
 
                 Task::none()
             }
             Message::StepFrame => {
                 self.is_running = false;
-                self.total_cycles += self.machine.step_frame().unwrap() as u64;
+                self.total_cycles +=  self.machine.step_frame().unwrap().0 as u64;
 
                 Task::none()
             }

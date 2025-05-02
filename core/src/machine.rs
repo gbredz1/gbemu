@@ -1,5 +1,6 @@
 use crate::bus::{InterruptBus, MemorySystem};
 use crate::cpu::Cpu;
+use crate::debug::breakpoint::BreakpointManager;
 use crate::ppu::Ppu;
 use std::error::Error;
 
@@ -10,6 +11,7 @@ pub struct Machine {
     ppu: Ppu,
 
     start_addr: Option<u16>,
+    breakpoint_manager: BreakpointManager,
 }
 
 impl Machine {
@@ -33,14 +35,25 @@ impl Machine {
     pub fn start_addr(&self) -> Option<u16> {
         self.start_addr
     }
+    pub fn set_breakpoint(&mut self, addr: u16) {
+        self.breakpoint_manager.clear();
+        self.breakpoint_manager.add_breakpoint(addr);
+    }
 
-    pub fn step_frame(&mut self) -> Result<usize, Box<dyn Error>> {
+    pub fn step_frame(&mut self) -> Result<(usize, bool), Box<dyn Error>> {
         let mut total_cycles = 0;
+        let mut break_flag = false;
+
         for _ in 0..70224 {
             total_cycles += self.step()?;
+
+            if self.breakpoint_manager.has_breakpoint(self.cpu.pc()) {
+                break_flag = true;
+                break;
+            }
         }
 
-        Ok(total_cycles)
+        Ok((total_cycles, break_flag))
     }
 
     pub fn step(&mut self) -> Result<usize, Box<dyn Error>> {
