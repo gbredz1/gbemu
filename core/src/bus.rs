@@ -63,7 +63,7 @@ macro_rules! define_u8_accessors {
 }
 pub(crate) use define_u8_accessors;
 macro_rules! define_palette_accessors {
- ($name:ident, $addr:expr) => {
+    ($name:ident, $addr:expr) => {
         fn $name(&self) -> u8 {
             self.read_byte($addr)
         }
@@ -81,6 +81,8 @@ pub(crate) use define_palette_accessors;
 
 pub struct MemorySystem {
     memory: Vec<u8>,
+    boot_rom: [u8; 0x100],
+    boot_rom_enabled: bool,
 }
 
 impl MemorySystem {
@@ -94,11 +96,22 @@ impl Default for MemorySystem {
     fn default() -> Self {
         Self {
             memory: vec![0xFFu8; 0x1_0000],
+            boot_rom_enabled: false,
+            boot_rom: [0; 0x100],
         }
     }
 }
 
 impl MemorySystem {
+    pub fn load_boot_rom(&mut self) -> Result<(), std::io::Error> {
+        self.boot_rom_enabled = true;
+
+        let mut boot_file = File::open("roms/dmg.bin")?;
+        boot_file.read_exact(&mut self.boot_rom)?;
+
+        Ok(())
+    }
+
     pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
         let mut file = File::open(path)?;
         let mut rom = vec![];
@@ -145,7 +158,11 @@ pub trait InterruptBus: BusIO {
 }
 impl BusIO for MemorySystem {
     fn read_byte(&self, addr: u16) -> u8 {
-        self.read_byte(addr)
+        if self.boot_rom_enabled && addr < 0x100 {
+            self.boot_rom[addr as usize]
+        } else {
+            self.read_byte(addr)
+        }
     }
 
     fn write_byte(&mut self, addr: u16, byte: u8) {

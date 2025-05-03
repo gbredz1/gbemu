@@ -9,12 +9,15 @@ pub struct Machine {
     cpu: Cpu,
     bus: MemorySystem,
     ppu: Ppu,
-
     start_addr: Option<u16>,
     breakpoint_manager: BreakpointManager,
 }
 
 impl Machine {
+    pub fn use_boot_rom(&mut self) -> Result<(), std::io::Error> {
+        self.start_addr = Some(0x0000);
+        self.bus.load_boot_rom()
+    }
     pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
         self.bus.load_cartridge(path)
     }
@@ -29,12 +32,6 @@ impl Machine {
         &self.bus
     }
 
-    pub fn set_start_addr(&mut self, addr: u16) {
-        self.start_addr = Some(addr);
-    }
-    pub fn start_addr(&self) -> Option<u16> {
-        self.start_addr
-    }
     pub fn set_breakpoint(&mut self, addr: u16) {
         self.breakpoint_manager.clear();
         self.breakpoint_manager.add_breakpoint(addr);

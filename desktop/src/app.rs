@@ -38,9 +38,9 @@ pub enum Message {
 impl Default for App {
     fn default() -> Self {
         let mut device = Machine::default();
-        device.set_start_addr(0x0000);
+        device.use_boot_rom().expect("Failed to load boot rom");
         device.reset();
-        device.load_cartridge("roms/bios.gb").expect("Failed to load cartridge");
+        device.load_cartridge("roms/test.gb").expect("Failed to load cartridge");
 
         Self {
             machine: device,
@@ -82,6 +82,7 @@ impl App {
                 let (cycles, break_flag) = self.machine.step_frame().expect("Failed to update the machine");
                 self.total_cycles += cycles as u64;
                 if break_flag {
+                    self.machine.set_breakpoint(0x0000);
                     self.is_running = false;
                 }
 

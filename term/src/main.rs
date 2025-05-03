@@ -22,7 +22,7 @@ fn main() -> io::Result<()> {
     let mut app = App::default();
     app.step_by_step = false;
     app.set_logs(logs);
-    app.load("roms/bios.gb")?;
+    app.load("roms/dmg.bin")?;
 
     let mut terminal = ratatui::init();
     let app_result = app.run(&mut terminal);
@@ -75,7 +75,7 @@ impl App {
         Ok(())
     }
 
-    fn update(&mut self, delta: &Duration) -> io::Result<()> {
+    fn update(&mut self, _delta: &Duration) -> io::Result<()> {
         if self.step_by_step {
             self.machine.step().expect("Error while stepping machine");
         } else {
