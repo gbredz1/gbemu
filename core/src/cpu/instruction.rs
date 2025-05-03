@@ -3,7 +3,7 @@ use crate::cpu::addressing_mode::{CC, Op};
 use crate::cpu::instruction::Operation::*;
 use crate::cpu::{Cpu, CpuBus, Flags};
 use crate::z;
-use log::{debug, trace};
+use log::{error, trace};
 
 macro_rules! read_u16_le {
     ($data:expr) => {
@@ -43,7 +43,7 @@ macro_rules! read_operand_value_u8 {
             z!("(BC)") => $bus.read_byte($cpu.bc()),
             z!("(nn)") => $bus.read_byte(read_u16_le!($data)),
             _ => {
-                debug!("Unsupported operand: {:?}", $op);
+                error!("op_read_u8: Unsupported operand: `{}`", $op);
                 unreachable!("Unsupported operand")
             }
         }
@@ -58,7 +58,7 @@ macro_rules! read_operand_value_u16 {
             z!("nn") => read_u16_le!($data),
             z!("HL") => $cpu.hl(),
             _ => {
-                debug!("Unsupported operand: {:?}", $op);
+                error!("op_read_u16: Unsupported operand: `{}`", $op);
                 unreachable!("Unsupported operand")
             }
         }
@@ -77,6 +77,8 @@ macro_rules! write_to_operand_u8 {
             z!("(n)") => $bus.write_byte(0xFF00 | $data[0] as u16, $value),
             z!("(C)") => $bus.write_byte(0xFF00 | $cpu.c() as u16, $value),
             z!("(nn)") => $bus.write_byte(read_u16_le!($data), $value),
+            z!("(DE)") => $bus.write_byte($cpu.de(), $value),
+            z!("(BC)") => $bus.write_byte($cpu.bc(), $value),
             z!("(HL)") => $bus.write_byte($cpu.hl(), $value),
             z!("(HL+)") => {
                 $bus.write_byte($cpu.hl(), $value);
@@ -87,7 +89,7 @@ macro_rules! write_to_operand_u8 {
                 $cpu.set_hl($cpu.hl().wrapping_sub(1));
             }
             _ => {
-                debug!("Unsupported operand: {:?}", $op);
+                error!("op_write_u8: Unsupported operand: `{}`", $op);
                 unreachable!("Unsupported operand")
             }
         }
@@ -102,7 +104,7 @@ macro_rules! write_to_operand_u16 {
             z!("HL") => $cpu.set_hl($value),
             z!("SP") => $cpu.set_sp($value),
             _ => {
-                debug!("Unsupported operand: {:?}", $op);
+                error!("op_write_u16: Unsupported operand: `{}`", $op);
                 unreachable!("Unsupported operand")
             }
         }
@@ -550,6 +552,10 @@ impl Instruction {
             }
             EI => {
                 cpu.set_ime(true);
+                self.cycles
+            }
+            HALT => {
+                cpu.halt();
                 self.cycles
             }
 
