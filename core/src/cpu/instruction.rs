@@ -418,7 +418,6 @@ impl Instruction {
                         cpu.set_flag_if(Flags::Z, result == 0);
                         cpu.set_flag(Flags::N);
                         cpu.set_flag_if(Flags::H, (value & 0x0F) == 0);
-                        cpu.clear_flag(Flags::C);
                     },
                     {
                         let value = read_operand_value_u16!(cpu, bus, data, op);
@@ -473,21 +472,21 @@ impl Instruction {
 
             RLA => {
                 let val = cpu.a();
-                let result = val.rotate_left(1) | cpu.flag(Flags::C) as u8;
+                let result = val << 1 | cpu.flag(Flags::C) as u8;
                 cpu.set_a(result);
 
                 cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
-                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
 
                 self.cycles
             }
             RRA => {
                 let val = cpu.a();
-                let result = val.rotate_right(1) | (cpu.flag(Flags::C) as u8) << 7;
+                let result = val >> 1 | (cpu.flag(Flags::C) as u8) << 7;
                 cpu.set_a(result);
 
                 cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
-                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
 
                 self.cycles
             }
@@ -497,7 +496,7 @@ impl Instruction {
                 cpu.set_a(result);
 
                 cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
-                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
 
                 self.cycles
             }
@@ -507,7 +506,7 @@ impl Instruction {
                 cpu.set_a(result);
 
                 cpu.clear_flag(Flags::Z | Flags::N | Flags::H);
-                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
 
                 self.cycles
             }
