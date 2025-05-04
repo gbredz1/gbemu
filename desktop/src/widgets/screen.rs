@@ -1,7 +1,7 @@
 use iced::mouse::Cursor;
 use iced::widget::canvas;
 use iced::widget::canvas::Geometry;
-use iced::{Color, Element, Point, Size};
+use iced::{Color, Element, Point, Size, Task};
 use iced::{Rectangle, Renderer, Theme};
 
 #[derive(Default)]
@@ -18,10 +18,12 @@ impl Screen {
     pub const WIDTH: usize = 160;
     pub const HEIGHT: usize = 144;
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::UpdateFrameBuffer => self.clear(),
         }
+
+        Task::none()
     }
     pub fn view<'a>(&'a self, frame_buffer: &'a Vec<u8>) -> Element<'a, Message> {
         canvas(ScreenCanvas {
