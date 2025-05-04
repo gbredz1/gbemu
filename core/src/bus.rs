@@ -1,6 +1,7 @@
 use crate::cpu::CpuBus;
 use crate::ppu::PpuBus;
 use bitflags::bitflags;
+use log::error;
 use std::default::Default;
 use std::fs::File;
 use std::io::Read;
@@ -123,25 +124,31 @@ impl MemorySystem {
 
     #[inline(always)]
     pub fn read_byte(&self, address: u16) -> u8 {
-        unsafe { *self.memory.get_unchecked(address as usize) }
+        if self.boot_rom_enabled && address < 0x100 {
+            unsafe { *self.boot_rom.get_unchecked(address as usize) }
+        } else {
+            unsafe { *self.memory.get_unchecked(address as usize) }
+        }
     }
     #[inline(always)]
     pub fn write_byte(&mut self, address: u16, byte: u8) {
-        unsafe {
-            *self.memory.get_unchecked_mut(address as usize) = byte;
+        if self.boot_rom_enabled && address < 0x100 {
+            error!("Writing to boot rom is not allowed");
+        } else {
+            unsafe {
+                *self.memory.get_unchecked_mut(address as usize) = byte;
+            }
         }
     }
 
     pub fn read_word(&self, address: u16) -> u16 {
-        (self.memory[address as usize] as u16)  // LSB first
-            | (self.memory[address as usize + 1] as u16) << 8 // MSB second
+        (self.read_byte(address) as u16)  // LSB first
+                | (self.read_byte(address + 1) as u16) << 8 // MSB second
     }
 
     pub fn write_word(&mut self, address: u16, word: u16) {
-        unsafe {
-            *self.memory.get_unchecked_mut(address as usize) = word as u8; // LSB first
-            *self.memory.get_unchecked_mut(address as usize + 1) = (word >> 8) as u8; // MSB second
-        }
+        self.write_byte(address, word as u8); // LSB first
+        self.write_byte(address + 1, (word >> 8) as u8); // MSB second
     }
 }
 
@@ -157,24 +164,20 @@ pub trait InterruptBus: BusIO {
     define_flags_accessors!(interrupt_enable, 0xFFFF, Interrupt);
 }
 impl BusIO for MemorySystem {
-    fn read_byte(&self, addr: u16) -> u8 {
-        if self.boot_rom_enabled && addr < 0x100 {
-            self.boot_rom[addr as usize]
-        } else {
-            self.read_byte(addr)
-        }
+    fn read_byte(&self, address: u16) -> u8 {
+        self.read_byte(address)
     }
 
-    fn write_byte(&mut self, addr: u16, byte: u8) {
-        self.write_byte(addr, byte);
+    fn write_byte(&mut self, address: u16, byte: u8) {
+        self.write_byte(address, byte)
     }
 
-    fn read_word(&self, addr: u16) -> u16 {
-        self.read_word(addr)
+    fn read_word(&self, address: u16) -> u16 {
+        self.read_word(address)
     }
 
-    fn write_word(&mut self, addr: u16, word: u16) {
-        self.write_word(addr, word);
+    fn write_word(&mut self, address: u16, word: u16) {
+        self.write_word(address, word)
     }
 }
 

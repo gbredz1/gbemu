@@ -255,7 +255,6 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
     column![controls, content].spacing(10).padding(8).into()
 }
 
-
 #[allow(dead_code)]
 enum MemorySectors {
     RomBank0,
