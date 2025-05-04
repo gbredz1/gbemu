@@ -1,5 +1,5 @@
-use crate::app::App;
-use iced::{run, window, Font, Point, Settings, Size};
+use crate::app::{App, Message};
+use iced::{Font, Point, Settings, Size, window};
 
 mod app;
 pub(crate) mod style;
@@ -8,16 +8,18 @@ pub(crate) mod views;
 pub(crate) mod widgets;
 
 use clap::Parser;
+use iced::futures::SinkExt;
 use log::info;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 #[derive(Debug)]
 struct Args {
-    #[arg(short, long)]
-    rom_path: String,
+    rom_path: Option<String>,
     #[arg(short = 'b', long, default_value = "false")]
     use_boot_rom: bool,
+    #[arg(long = "run", default_value = "false")]
+    auto_run: bool,
 }
 
 fn main() -> iced::Result {
@@ -45,10 +47,19 @@ fn main() -> iced::Result {
                 app.machine.use_boot_rom().expect("Failed to load boot rom");
             }
             app.machine.reset();
-            app.machine
-                .load_cartridge(args.rom_path.as_str())
-                .expect("Failed to load cartridge");
 
-            (app, iced::Task::none())
+            if let Some(rom_path) = &args.rom_path {
+                app.machine
+                    .load_cartridge(rom_path.as_str())
+                    .expect("Failed to load cartridge");
+            }
+
+            let command = if args.auto_run {
+                iced::Task::done(Message::TogglePlayback)
+            } else {
+                iced::Task::none()
+            };
+
+            (app, command)
         })
 }
