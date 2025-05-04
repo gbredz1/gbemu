@@ -14,10 +14,12 @@ mod instruction;
 mod decoder_test;
 mod display;
 mod register;
+mod instruction_test;
 
 use crate::{cpu_decode, cpu_decode_cb};
 
 bitflags! {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub struct Flags: u8 {
         const Z = 0b1000_0000;
         const N = 0b0100_0000;
@@ -85,7 +87,7 @@ impl Cpu {
             data.push(self.pc_read_byte(bus));
         }
 
-        Ok(instruction.execute(self, bus, data))
+        Ok(instruction.execute(self, bus, &data))
     }
 
     pub(crate) fn fetch_cb_instruction(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {

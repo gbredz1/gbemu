@@ -57,6 +57,8 @@ macro_rules! read_operand_value_u16 {
             z!("DE") => $cpu.de(),
             z!("nn") => read_u16_le!($data),
             z!("HL") => $cpu.hl(),
+            z!("SP") => $cpu.sp(),
+            z!("SP+e") => $cpu.sp().wrapping_add_signed($data[0] as i16),
             _ => {
                 error!("op_read_u16: Unsupported operand: `{}`", $op);
                 unreachable!("Unsupported operand")
@@ -96,13 +98,14 @@ macro_rules! write_to_operand_u8 {
     };
 }
 macro_rules! write_to_operand_u16 {
-    ($cpu:expr, $bus:expr, $op:expr, $value:expr) => {
+    ($cpu:expr, $bus:expr, $data:expr, $op:expr, $value:expr) => {
         match $op {
             z!("AF") => $cpu.set_af($value),
             z!("BC") => $cpu.set_bc($value),
             z!("DE") => $cpu.set_de($value),
             z!("HL") => $cpu.set_hl($value),
             z!("SP") => $cpu.set_sp($value),
+            z!("(nn)") => $bus.write_word(read_u16_le!($data), $value),
             _ => {
                 error!("op_write_u16: Unsupported operand: `{}`", $op);
                 unreachable!("Unsupported operand")
@@ -122,13 +125,13 @@ macro_rules! handle_cc_not_taken {
 macro_rules! match_size {
     ($op1:expr, $block_8bit:block, $block_16bit:block) => {
         match $op1 {
-            z!("AF") | z!("BC") | z!("DE") | z!("HL") | z!("SP") => $block_16bit,
+            z!("AF") | z!("BC") | z!("DE") | z!("HL") | z!("SP") | z!("SP+e") | z!("nn") => $block_16bit,
             _ => $block_8bit,
         }
     };
     ($cpu:expr, $bus:expr, $data:expr, $op1:expr, $op2:expr, $block_8bit:block) => {
         match $op1 {
-            z!("AF") | z!("BC") | z!("DE") | z!("HL") | z!("SP") => {}
+            z!("AF") | z!("BC") | z!("DE") | z!("HL") | z!("SP") | z!("SP+e") | z!("nn") => {}
             _ => $block_8bit,
         }
     };
@@ -207,7 +210,7 @@ impl Instruction {
         }
     }
 
-    pub fn execute(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: Vec<u8>) -> usize {
+    pub fn execute(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &Vec<u8>) -> usize {
         match self.operation {
             NOP => self.cycles,
 
@@ -290,7 +293,7 @@ impl Instruction {
             }
             POP(op) => {
                 let value = cpu.sp_pop_word(bus);
-                write_to_operand_u16!(cpu, bus, op, value);
+                write_to_operand_u16!(cpu, bus, data, op, value);
 
                 self.cycles
             }
@@ -336,7 +339,7 @@ impl Instruction {
                         if op2 == z!("e") {
                             let val2 = read_operand_value_u8!(cpu, bus, data, op2) as i16;
                             let (result, carry) = val1.overflowing_add_signed(val2);
-                            write_to_operand_u16!(cpu, bus, op1, result);
+                            write_to_operand_u16!(cpu, bus, data, op1, result);
 
                             cpu.clear_flag(Flags::Z);
                             cpu.clear_flag(Flags::N);
@@ -345,7 +348,7 @@ impl Instruction {
                         } else {
                             let val2 = read_operand_value_u16!(cpu, bus, data, op2);
                             let (result, carry) = val1.overflowing_add(val2);
-                            write_to_operand_u16!(cpu, bus, op1, result);
+                            write_to_operand_u16!(cpu, bus, data, op1, result);
 
                             cpu.clear_flag(Flags::N);
                             cpu.set_flag_if(Flags::H, (val1 & 0x0FFF) + (val2 & 0x0FFF) > 0x0FFF);
@@ -374,14 +377,14 @@ impl Instruction {
             }
             SUB(op) => {
                 let val = read_operand_value_u8!(cpu, bus, data, op);
-
-                let result = cpu.a().wrapping_sub(val);
-                cpu.set_a(result);
+                let (result, carry) = cpu.a().overflowing_sub(val);
 
                 cpu.set_flag_if(Flags::Z, result == 0);
                 cpu.set_flag(Flags::N);
-                cpu.set_flag_if(Flags::H, (cpu.a() & 0x0F) < (val & 0x0F));
-                cpu.set_flag_if(Flags::C, cpu.a() < val);
+                cpu.set_flag_if(Flags::H, cpu.a() & 0xF < val & 0xF);
+                cpu.set_flag_if(Flags::C, carry);
+
+                cpu.set_a(result);
 
                 self.cycles
             }
@@ -424,7 +427,7 @@ impl Instruction {
                     {
                         let value = read_operand_value_u16!(cpu, bus, data, op);
                         let result = value.wrapping_sub(1);
-                        write_to_operand_u16!(cpu, bus, op, result);
+                        write_to_operand_u16!(cpu, bus, data, op, result);
                     }
                 );
 
@@ -441,26 +444,24 @@ impl Instruction {
                         cpu.set_flag_if(Flags::Z, result == 0);
                         cpu.clear_flag(Flags::N);
                         cpu.set_flag_if(Flags::H, (value & 0x0F) == 0xF);
-                        cpu.clear_flag(Flags::C);
                     },
                     {
                         let value = read_operand_value_u16!(cpu, bus, data, op);
                         let result = value.wrapping_add(1);
-                        write_to_operand_u16!(cpu, bus, op, result);
+                        write_to_operand_u16!(cpu, bus, data, op, result);
                     }
                 );
 
                 self.cycles
             }
             CP(op) => {
-                let value = read_operand_value_u8!(cpu, bus, data, op);
-                let result = cpu.a().wrapping_sub(value);
-                cpu.set_a(result);
+                let val = read_operand_value_u8!(cpu, bus, data, op);
+                let (result, carry) = cpu.a().overflowing_sub(val);
 
                 cpu.set_flag_if(Flags::Z, result == 0);
                 cpu.set_flag(Flags::N);
-                cpu.set_flag_if(Flags::H, (cpu.a() & 0x0F) < (value & 0x0F));
-                cpu.set_flag_if(Flags::C, cpu.a() < value);
+                cpu.set_flag_if(Flags::H, cpu.a() & 0xF < val & 0xF);
+                cpu.set_flag_if(Flags::C, carry);
 
                 self.size
             }
@@ -469,6 +470,11 @@ impl Instruction {
                 cpu.set_flag(Flags::N);
                 cpu.set_flag(Flags::H);
 
+                self.cycles
+            }
+            SCF => {
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag(Flags::C);
                 self.cycles
             }
 
@@ -515,14 +521,20 @@ impl Instruction {
 
             LD(op1, op2) => {
                 match_size!(
-                    op1,
+                    op2,
                     {
                         let val_u8 = read_operand_value_u8!(cpu, bus, data, op2);
                         write_to_operand_u8!(cpu, bus, data, op1, val_u8);
                     },
                     {
                         let val_u16 = read_operand_value_u16!(cpu, bus, data, op2);
-                        write_to_operand_u16!(cpu, bus, op1, val_u16);
+                        write_to_operand_u16!(cpu, bus, data, op1, val_u16);
+
+                        if op1 == z!("HL") && op2 == z!("SP+e") {
+                            cpu.clear_flag(Flags::Z | Flags::N);
+                            cpu.set_flag_if(Flags::H, val_u16 & 0x08 != 0);
+                            cpu.set_flag_if(Flags::C, val_u16 & 0x80 != 0);
+                        }
                     }
                 );
 
@@ -558,6 +570,7 @@ impl Instruction {
                 cpu.halt();
                 self.cycles
             }
+            STOP => self.cycles,
 
             CBPrefix => cpu.fetch_cb_instruction(bus).expect("invalid cb prefix"),
             _ => todo!("not implemented: {}", self.operation),
