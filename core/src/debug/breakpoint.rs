@@ -18,6 +18,10 @@ impl BreakpointManager {
         self.breakpoints.contains(&address)
     }
 
+    pub fn len(&self) -> usize {
+        self.breakpoints.len()
+    }
+
     pub fn clear(&mut self) {
         self.breakpoints.clear();
     }

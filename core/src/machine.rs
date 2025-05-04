@@ -32,9 +32,12 @@ impl Machine {
         &self.bus
     }
 
-    pub fn set_breakpoint(&mut self, addr: u16) {
-        self.breakpoint_manager.clear();
-        self.breakpoint_manager.add_breakpoint(addr);
+    pub fn breakpoint_manager(&self) -> &BreakpointManager {
+        &self.breakpoint_manager
+    }
+
+    pub fn breakpoint_manager_mut(&mut self) -> &mut BreakpointManager {
+        &mut self.breakpoint_manager
     }
 
     pub fn step_frame(&mut self) -> Result<(usize, bool), Box<dyn Error>> {

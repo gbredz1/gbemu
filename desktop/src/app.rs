@@ -6,7 +6,7 @@ use iced::alignment::Vertical;
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{keyboard, time, window, Element, Subscription, Task};
+use iced::{Element, Subscription, Task, keyboard, time, window}; 
 use std::time::{Duration, Instant};
 
 pub(crate) struct App {
@@ -26,8 +26,10 @@ pub enum Message {
     TogglePlayback,
     Step,
     Reset,
-    StepToAddr(u16),
-    StepToAddrInputChanged(String),
+    BreakpointRemove,
+    BreakpointSet(u16),
+    BreakpointInputChanged(String),
+
     Screen(screen::Message),
     CloseWindow,
 
@@ -77,7 +79,6 @@ impl App {
                 let (cycles, break_flag) = self.machine.step_frame().expect("Failed to update the machine");
                 self.total_cycles += cycles as u64;
                 if break_flag {
-                    self.machine.set_breakpoint(0x0000);
                     self.is_running = false;
                 }
 
@@ -90,19 +91,25 @@ impl App {
 
                 Task::none()
             }
-            Message::StepToAddr(addr) => {
-                self.is_running = true;
-                self.machine.set_breakpoint(addr);
-
-                Task::none()
-            }
             Message::StepFrame => {
                 self.is_running = false;
                 self.total_cycles += self.machine.step_frame().unwrap().0 as u64;
 
                 Task::none()
             }
-            Message::StepToAddrInputChanged(content) => {
+
+            // Breakpoints
+            Message::BreakpointRemove => {
+                self.machine.breakpoint_manager_mut().clear();
+                Task::none()
+            }
+            Message::BreakpointSet(addr) => {
+                self.is_running = true;
+                self.machine.breakpoint_manager_mut().add_breakpoint(addr);
+
+                Task::none()
+            }
+            Message::BreakpointInputChanged(content) => {
                 self.breakpoint_at = content;
 
                 Task::none()
@@ -173,19 +180,26 @@ fn view_control<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
         .style(button::secondary);
     let total_cycles = text(format!("Cycles: {}", app.total_cycles));
 
+    let breakpoint_empty = app.machine.breakpoint_manager().len() == 0;
     let breakpoint_u16 = || {
-        u16::from_str_radix(app.breakpoint_at.as_str(), 16)
-            .map(Message::StepToAddr)
-            .ok()
+        if breakpoint_empty {
+            u16::from_str_radix(app.breakpoint_at.as_str(), 16)
+                .map(Message::BreakpointSet)
+                .ok()
+        } else {
+            Some(Message::BreakpointRemove)
+        }
     };
 
-    let step_to = row![
+    let breakpoint_controls = row![
         text("Breakpoint at: $"),
         text_input("Breakpoint", &app.breakpoint_at)
             .width(60)
-            .on_input(Message::StepToAddrInputChanged)
+            .on_input(Message::BreakpointInputChanged)
             .on_submit_maybe(breakpoint_u16()),
-        button("Go").on_press_maybe(breakpoint_u16()).style(button::secondary),
+        button(if breakpoint_empty { "Go" } else { "Del" })
+            .on_press_maybe(breakpoint_u16())
+            .style(button::secondary),
     ]
     .align_y(Vertical::Center);
 
@@ -194,7 +208,7 @@ fn view_control<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
         step_button,
         step_frame_button,
         reset_button,
-        step_to,
+        breakpoint_controls,
         total_cycles
     ]
     .spacing(8)

@@ -8,7 +8,6 @@ pub(crate) mod views;
 pub(crate) mod widgets;
 
 use clap::Parser;
-use iced::futures::SinkExt;
 use log::info;
 
 #[derive(Parser)]
