@@ -10,6 +10,7 @@ gbrust-core = { path = "../core" }
 env_logger = "0.11"
 dotenv = "0.15"
 log = "0.4"
+clap = { version = "4.5", features = ["derive"] }
 
 iced = { version = "0.13", features = ["canvas", "tokio"] }
 iced_aw = { version = "0.12", default-features = false, features = ["menu", "grid"] }

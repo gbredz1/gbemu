@@ -6,11 +6,11 @@ use iced::alignment::Vertical;
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Element, Subscription, Task, keyboard, time, window};
+use iced::{keyboard, time, window, Element, Subscription, Task};
 use std::time::{Duration, Instant};
 
 pub(crate) struct App {
-    machine: Machine,
+    pub machine: Machine,
     last_update: Option<Instant>,
     is_running: bool,
     breakpoint_at: String,
@@ -37,13 +37,8 @@ pub enum Message {
 
 impl Default for App {
     fn default() -> Self {
-        let mut device = Machine::default();
-        device.use_boot_rom().expect("Failed to load boot rom");
-        device.reset();
-        device.load_cartridge("roms/test.gb").expect("Failed to load cartridge");
-
         Self {
-            machine: device,
+            machine: Machine::default(),
             last_update: None,
             is_running: false,
             breakpoint_at: "00e9".into(),
@@ -103,7 +98,7 @@ impl App {
             }
             Message::StepFrame => {
                 self.is_running = false;
-                self.total_cycles +=  self.machine.step_frame().unwrap().0 as u64;
+                self.total_cycles += self.machine.step_frame().unwrap().0 as u64;
 
                 Task::none()
             }
