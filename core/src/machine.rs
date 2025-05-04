@@ -2,7 +2,9 @@ use crate::bus::{InterruptBus, MemorySystem};
 use crate::cpu::Cpu;
 use crate::debug::breakpoint::BreakpointManager;
 use crate::ppu::Ppu;
+use log::info;
 use std::error::Error;
+use std::path::Path;
 
 #[derive(Default)]
 pub struct Machine {
@@ -18,7 +20,8 @@ impl Machine {
         self.start_addr = Some(0x0000);
         self.bus.load_boot_rom()
     }
-    pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
+    pub fn load_cartridge<P: AsRef<Path>>(&mut self, path: P) -> Result<usize, std::io::Error> {
+        info!("Loading cartridge: {:?}", path.as_ref());
         self.bus.load_cartridge(path)
     }
 
@@ -64,6 +67,7 @@ impl Machine {
     }
 
     pub fn reset(&mut self) {
+        info!("Resetting");
         self.bus.reset();
         self.cpu.reset();
         if let Some(addr) = self.start_addr {

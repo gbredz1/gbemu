@@ -8,7 +8,7 @@ pub(crate) mod views;
 pub(crate) mod widgets;
 
 use clap::Parser;
-use log::info;
+use log::debug;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -26,7 +26,7 @@ fn main() -> iced::Result {
     env_logger::builder().format_timestamp_nanos().init();
 
     let args = Args::parse();
-    info!("{:?}", args);
+    debug!("{:?}", args);
 
     iced::application(App::title, App::update, App::view)
         .antialiasing(false)

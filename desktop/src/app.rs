@@ -6,7 +6,7 @@ use iced::alignment::Vertical;
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Element, Subscription, Task, keyboard, time, window}; 
+use iced::{Element, Subscription, Task, keyboard, time, window};
 use std::time::{Duration, Instant};
 
 pub(crate) struct App {
@@ -35,6 +35,8 @@ pub enum Message {
 
     MemoryView(view_memory::Message),
     StepFrame,
+
+    OpenFile,
 }
 
 impl Default for App {
@@ -115,6 +117,23 @@ impl App {
                 Task::none()
             }
 
+            // Rom load
+            Message::OpenFile => {
+                let dialog = native_dialog::DialogBuilder::file()
+                    .set_title("Open file")
+                    .add_filter("ROM", ["gb"])
+                    .open_single_file();
+
+                let result = dialog.show();
+
+                if let Ok(Some(path)) = result {
+                    self.machine.reset();
+                    self.machine.load_cartridge(path).expect("Failed to load rom");
+                };
+
+                Task::none()
+            }
+
             Message::TogglePlayback => {
                 self.is_running = !self.is_running;
                 if !self.is_running {
@@ -139,7 +158,6 @@ impl App {
             Message::MemoryView(msg) => self.view_memory_state.update(msg).map(Message::MemoryView),
         }
     }
-
     pub fn view(&self) -> Element<Message> {
         let controls = view_control(self.is_running, self);
         let cpu_state = title_panel("CPU", view_cpu::view(self.machine.cpu())).center_x(200);
@@ -203,12 +221,15 @@ fn view_control<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
     ]
     .align_y(Vertical::Center);
 
+    let load_rom = button("Load ROM").style(button::secondary).on_press(Message::OpenFile);
+
     row![
         run_button,
         step_button,
         step_frame_button,
         reset_button,
         breakpoint_controls,
+        load_rom,
         total_cycles
     ]
     .spacing(8)

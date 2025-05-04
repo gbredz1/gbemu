@@ -5,6 +5,7 @@ use log::error;
 use std::default::Default;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
 bitflags! {
     pub struct Interrupt: u8 {
@@ -113,7 +114,7 @@ impl MemorySystem {
         Ok(())
     }
 
-    pub fn load_cartridge(&mut self, path: &str) -> Result<usize, std::io::Error> {
+    pub fn load_cartridge<P: AsRef<Path>>(&mut self, path: P) -> Result<usize, std::io::Error> {
         let mut file = File::open(path)?;
         let mut rom = vec![];
         let size = file.read_to_end(&mut rom)?;
