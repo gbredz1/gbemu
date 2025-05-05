@@ -17,6 +17,14 @@ mod tests {
             }
         };
     }
+    macro_rules! output {
+        ($o:expr) => {
+            match $o {
+                "a" => |m: &TestMachine| m.cpu.a(),
+                _ => panic!("Invalid"),
+            }
+        };
+    }
 
     struct FlagsTest {
         z: bool,
@@ -31,20 +39,13 @@ mod tests {
         instr: Instruction,
     }
 
-    impl Default for TestMachine {
-        fn default() -> Self {
+    impl TestMachine {
+        fn with_operation(operation: Operation) -> Self {
             Self {
                 cpu: Cpu::default(),
                 bus: TestBus::default(),
-                instr: Instruction::from(NOP, 0, 0, 0),
+                instr: Instruction::from(operation, 0, 0, 0),
             }
-        }
-    }
-
-    impl TestMachine {
-        fn set_operation(&mut self, operation: Operation) -> &mut Self {
-            self.instr = Instruction::from(operation, 0, 0, 0);
-            self
         }
 
         fn clear_flags(&mut self) -> &mut Self {
@@ -63,7 +64,6 @@ mod tests {
         }
 
         fn check_flags(&mut self, op1: u8, op2: u8, expected_flags: FlagsTest) {
-            self.clear_flags();
             self.cpu.set_a(op1);
             self.run(vec![op2]);
 
@@ -73,16 +73,21 @@ mod tests {
             self.assert_flags(Flags::C, expected_flags.c);
         }
 
-        fn check(
+        fn check_result<T: PartialEq + std::fmt::Debug + std::fmt::LowerHex>(
             &mut self,
             op1_val: u8,
             op2_val: u8,
-            expected_result: u8,
+            expected_result: T,
             expected_flags: FlagsTest,
-            result_validator: impl FnOnce(&mut Self, u8, u8, u8),
+            output: impl FnOnce(&Self) -> T,
         ) {
             self.check_flags(op1_val, op2_val, expected_flags);
-            result_validator(self, op1_val, op2_val, expected_result);
+            let output_val = output(self);
+            assert_eq!(
+                output_val, expected_result,
+                "Result incorrect : 0x{:x} != 0x{:x}",
+                output_val, expected_result
+            );
         }
 
         fn assert_flags(&self, flags: Flags, expected_value: bool) {
@@ -92,80 +97,131 @@ mod tests {
 
     #[test]
     fn test_cp() {
-        let mut m = TestMachine::default();
-        m.set_operation(CP(z!("n")));
+        let mut m = TestMachine::with_operation(CP(z!("n")));
 
         // Test zero flag (A == n)
+        m.clear_flags();
         m.check_flags(0x42, 0x42, f!(1, 1, 0, 0));
         // Test non-zero result (A > n)
+        m.clear_flags();
         m.check_flags(0b1000_0000, 0b0001_0000, f!(0, 1, 0, 0));
         // Test half carry (A & 0x0F < n & 0x0F)
+        m.clear_flags();
         m.check_flags(0b0001_0000, 0b0000_0001, f!(0, 1, 1, 0));
         // Test carry flag (A < n) = 0b1111_1111
+        m.clear_flags();
         m.check_flags(0b0000_0001, 0b0000_0010, f!(0, 1, 1, 1));
         // Test carry flag (A < n) = 0b1111_0000
+        m.clear_flags();
         m.check_flags(0b0000_0000, 0b0001_0000, f!(0, 1, 0, 1));
     }
 
     #[test]
     fn test_sub() {
-        let mut m = TestMachine::default();
-        m.set_operation(SUB(z!("n")));
-
-        let extra = |m: &mut TestMachine, _op1, _op2, res| {
-            assert_eq!(m.cpu.a(), res, "Result incorrect");
-        };
+        let mut m = TestMachine::with_operation(SUB(z!("n")));
 
         // Test zero flag (A == n)
-        m.check(0x42, 0x42, 0x00, f!(1, 1, 0, 0), extra);
+        m.check_result(0x42, 0x42, 0x00, f!(1, 1, 0, 0), |m| m.cpu.a());
         // Test non-zero result (A > n)
-        m.check(0b1000_0000, 0b0001_0000, 0b0111_0000, f!(0, 1, 0, 0), extra);
+        m.check_result(0b1000_0000, 0b0001_0000, 0b0111_0000, f!(0, 1, 0, 0), |m| m.cpu.a());
         // Test half carry (A & 0x0F < n & 0x0F)
-        m.check(0b0001_0000, 0b0000_0001, 0b0000_1111, f!(0, 1, 1, 0), extra);
+        m.check_result(0b0001_0000, 0b0000_0001, 0b0000_1111, f!(0, 1, 1, 0), |m| m.cpu.a());
         // Test carry flag (A < n) = 0b1111_1111
-        m.check(0b0000_0001, 0b0000_0010, 0b1111_1111, f!(0, 1, 1, 1), extra);
+        m.check_result(0b0000_0001, 0b0000_0010, 0b1111_1111, f!(0, 1, 1, 1), |m| m.cpu.a());
         // Test carry flag (A < n) = 0b1111_0000
-        m.check(0b0000_0000, 0b0001_0000, 0b1111_0000, f!(0, 1, 0, 1), extra);
+        m.check_result(0b0000_0000, 0b0001_0000, 0b1111_0000, f!(0, 1, 0, 1), |m| m.cpu.a());
     }
 
     #[test]
     fn test_add() {
-        let mut m = TestMachine::default();
-        m.set_operation(ADD(z!("A"), z!("n")));
-
-        let extra = |m: &mut TestMachine, _op1, _op2, res| {
-            assert_eq!(m.cpu.a(), res, "Result incorrect");
-        };
+        let mut m = TestMachine::with_operation(ADD(z!("A"), z!("n")));
 
         // Test zero flag (A == n)
-        m.check(0x00, 0x00, 0x00, f!(1, 0, 0, 0), extra);
+        m.clear_flags();
+        m.check_result(0x00, 0x00, 0x00, f!(1, 0, 0, 0), output!("a"));
         // Test non-zero result (A + n < 256)
-        m.check(0b1000_0000, 0b0001_0000, 0b1001_0000, f!(0, 0, 0, 0), extra);
+        m.clear_flags();
+        m.check_result(0b1000_0000, 0b0001_0000, 0b1001_0000, f!(0, 0, 0, 0), output!("a"));
         // Test half carry
-        m.check(0b0000_1111, 0b0000_0001, 0b0001_0000, f!(0, 0, 1, 0), extra);
+        m.clear_flags();
+        m.check_result(0b0000_1111, 0b0000_0001, 0b0001_0000, f!(0, 0, 1, 0), output!("a"));
         // Test carry flag
-        m.check(0b1111_0000, 0b0001_0010, 0b0000_0010, f!(0, 0, 0, 1), extra);
+        m.clear_flags();
+        m.check_result(0b1111_0000, 0b0001_0010, 0b0000_0010, f!(0, 0, 0, 1), output!("a"));
         // Test carry and half flags
-        m.check(0b1100_1100, 0b0111_0111, 0b0100_0011, f!(0, 0, 1, 1), extra);
+        m.clear_flags();
+        m.check_result(0b1100_1100, 0b0111_0111, 0b0100_0011, f!(0, 0, 1, 1), output!("a"));
     }
 
     #[test]
     fn test_scf() {
-        let mut m = TestMachine::default();
-        m.set_operation(SCF);
+        let mut m = TestMachine::with_operation(SCF);
 
-        // Cas 1: Tous les drapeaux sont effacés
+        // Case 1: All flags are erased.
         m.clear_flags().run(vec![]);
         m.assert_flags(Flags::Z, false);
         m.assert_flags(Flags::N, false);
         m.assert_flags(Flags::H, false);
         m.assert_flags(Flags::C, true);
 
-        // Cas 2: Le drapeau Z est actif
+        // Case 2: The Z flag is active
         m.clear_flags().set_flags(Flags::Z).run(vec![]);
         m.assert_flags(Flags::Z, true);
         m.assert_flags(Flags::N, false);
         m.assert_flags(Flags::H, false);
         m.assert_flags(Flags::C, true);
+    }
+
+    #[test]
+    fn test_daa() {
+        let mut m = TestMachine::with_operation(DAA);
+
+        // --- Tests after addition (N=0) ---
+
+        // Normal case (without adjustment)
+        m.clear_flags();
+        m.check_result(0x45, 0x00, 0x45, f!(0, 0, 0, 0), output!("a"));
+
+        // Lower nibble value > 9
+        m.clear_flags();
+        m.check_result(0x4A, 0x00, 0x50, f!(0, 0, 0, 0), output!("a"));
+
+        // Case with H flag defined
+        m.clear_flags().set_flags(Flags::H);
+        m.check_result(0x45, 0x00, 0x4b, f!(0, 0, 0, 0), output!("a"));
+
+        // Case with value > 0x99
+        m.clear_flags();
+        m.check_result(0xA5, 0x00, 0x05, f!(0, 0, 0, 1), output!("a"));
+
+        // Case with C flag set
+        m.clear_flags().set_flags(Flags::C);
+        m.check_result(0x45, 0x00, 0xA5, f!(0, 0, 0, 1), output!("a"));
+
+        // Special case - zero result
+        m.clear_flags();
+        m.check_result(0x00, 0x00, 0x00, f!(1, 0, 0, 0), output!("a"));
+
+        // Special case - result 0x9A becoming 0x00 with carry
+        m.clear_flags();
+        m.check_result(0x9A, 0x00, 0x00, f!(1, 0, 0, 1), output!("a"));
+
+        // --- Tests after subtraction (N=1) ---
+
+        // Normal case (without adjustment)
+        m.clear_flags().set_flags(Flags::N);
+        m.check_result(0x45, 0x00, 0x45, f!(0, 1, 0, 0), output!("a"));
+
+        // Case with H flag defined
+        m.clear_flags().set_flags(Flags::N | Flags::H);
+        m.check_result(0x45, 0x00, 0x3F, f!(0, 1, 0, 0), output!("a"));
+
+        // Case with flag C defined
+        m.clear_flags().set_flags(Flags::N | Flags::C);
+        m.check_result(0x45, 0x00, 0xE5, f!(0, 1, 0, 1), output!("a"));
+
+        // Case with H and C flags set
+        m.clear_flags().set_flags(Flags::N | Flags::H | Flags::C);
+        m.check_result(0x45, 0x00, 0xDF, f!(0, 1, 0, 1), output!("a"));
     }
 }

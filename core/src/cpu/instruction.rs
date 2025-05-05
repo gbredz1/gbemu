@@ -210,7 +210,7 @@ impl Instruction {
         }
     }
 
-    pub fn execute(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &Vec<u8>) -> usize {
+    pub fn execute(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &[u8]) -> usize {
         match self.operation {
             NOP => self.cycles,
 
@@ -292,7 +292,11 @@ impl Instruction {
                 self.cycles
             }
             POP(op) => {
-                let value = cpu.sp_pop_word(bus);
+                let value = match op {
+                    z!("AF") => cpu.sp_pop_word(bus) & 0xFFF0,
+                    _ => cpu.sp_pop_word(bus),
+                };
+
                 write_to_operand_u16!(cpu, bus, data, op, value);
 
                 self.cycles
@@ -478,6 +482,32 @@ impl Instruction {
                 self.cycles
             }
 
+            DAA => {
+                let n = cpu.flag(Flags::N);
+                let h = cpu.flag(Flags::H);
+                let c = cpu.flag(Flags::C);
+
+                // Calculate the adjustment value based on requirements
+                let adjust = match (c || (!n && cpu.a() > 0x99), h || (!n && (cpu.a() & 0x0f) > 0x9)) {
+                    (true, true) => 0x66,   // Adjust both nibbles
+                    (true, false) => 0x60,  // Adjust high nibble only
+                    (false, true) => 0x06,  // Adjust low nibble only
+                    (false, false) => 0x00, // No adjustment needed
+                };
+
+                if adjust != 0 {
+                    // Apply the adjustment considering flag N.
+                    let add_val = if n { (-(adjust as i8)) as u8 } else { adjust };
+                    cpu.set_a(cpu.a().wrapping_add(add_val));
+                }
+
+                // update flags
+                cpu.set_flag_if(Flags::Z, cpu.a() == 0);
+                cpu.set_flag_if(Flags::H, false);
+                cpu.set_flag_if(Flags::C, adjust >= 0x60);
+
+                self.cycles
+            }
             RLA => {
                 let val = cpu.a();
                 let result = val << 1 | cpu.flag(Flags::C) as u8;
