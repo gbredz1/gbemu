@@ -195,13 +195,13 @@ pub enum Operation {
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
     pub(crate) operation: Operation,
-    pub(crate) size: usize,
-    pub(crate) cycles: usize,
-    pub(crate) cycles_not_taken: usize,
+    pub(crate) size: u8,
+    pub(crate) cycles: u8,
+    pub(crate) cycles_not_taken: u8,
 }
 
 impl Instruction {
-    pub(crate) fn from(operation: Operation, size: usize, cycles: usize, cycles_not_taken: usize) -> Self {
+    pub(crate) fn from(operation: Operation, size: u8, cycles: u8, cycles_not_taken: u8) -> Self {
         Self {
             operation,
             size,
@@ -210,7 +210,7 @@ impl Instruction {
         }
     }
 
-    pub fn execute(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &[u8]) -> usize {
+    pub fn execute(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &[u8]) -> u8 {
         match self.operation {
             NOP => self.cycles,
 
@@ -615,7 +615,7 @@ impl Instruction {
         }
     }
 
-    pub fn execute_cb(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &[u8]) -> usize {
+    pub fn execute_cb(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &[u8]) -> u8 {
         match self.operation {
             SWAP(op) => {
                 let val = read_operand_value_u8!(cpu, bus, data, op);

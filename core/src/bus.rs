@@ -79,18 +79,21 @@ macro_rules! define_palette_accessors {
         }
     };
 }
+use crate::timer::timer_bus::TimerBus;
 pub(crate) use define_palette_accessors;
 
 pub struct MemorySystem {
     memory: Vec<u8>,
     boot_rom: [u8; 0x100],
     boot_rom_enabled: bool,
+    boot_rom_loaded: bool,
 }
 
 impl MemorySystem {
     pub(crate) fn reset(&mut self) {
         // Clear VRAM
         self.memory[0x8000..=0x9fff].fill(0);
+        self.boot_rom_enabled = self.boot_rom_loaded;
     }
 }
 
@@ -99,6 +102,7 @@ impl Default for MemorySystem {
         Self {
             memory: vec![0xFFu8; 0x1_0000],
             boot_rom_enabled: false,
+            boot_rom_loaded: false,
             boot_rom: [0; 0x100],
         }
     }
@@ -107,6 +111,7 @@ impl Default for MemorySystem {
 impl MemorySystem {
     pub fn load_boot_rom(&mut self) -> Result<(), std::io::Error> {
         self.boot_rom_enabled = true;
+        self.boot_rom_loaded = true;
 
         let mut boot_file = File::open("roms/dmg.bin")?;
         boot_file.read_exact(&mut self.boot_rom)?;
@@ -189,6 +194,7 @@ impl BusIO for MemorySystem {
 
 impl CpuBus for MemorySystem {}
 impl PpuBus for MemorySystem {}
+impl TimerBus for MemorySystem {}
 impl InterruptBus for MemorySystem {}
 
 #[cfg(test)]

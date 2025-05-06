@@ -57,7 +57,7 @@ impl Default for Cpu {
 }
 
 impl Cpu {
-    pub fn step(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
+    pub fn step(&mut self, bus: &mut impl CpuBus) -> Result<u8, String> {
         let interrupt_cycles = self.handle_interrupt(bus);
         if interrupt_cycles > 0 {
             return Ok(interrupt_cycles);
@@ -90,7 +90,7 @@ impl Cpu {
         Ok(instruction.execute(self, bus, &data))
     }
 
-    pub(crate) fn fetch_cb_instruction(&mut self, bus: &mut impl CpuBus) -> Result<usize, String> {
+    pub(crate) fn fetch_cb_instruction(&mut self, bus: &mut impl CpuBus) -> Result<u8, String> {
         let opcode = self.pc_read_byte(bus);
 
         let instruction = cpu_decode_cb!(opcode);
@@ -125,7 +125,7 @@ impl Cpu {
         value
     }
 
-    fn handle_interrupt(&mut self, bus: &mut impl CpuBus) -> usize {
+    fn handle_interrupt(&mut self, bus: &mut impl CpuBus) -> u8 {
         if self.halted {
             let if_val = bus.interrupt_flag();
             let ie_val = bus.interrupt_enable();

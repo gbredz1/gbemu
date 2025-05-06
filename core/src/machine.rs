@@ -2,6 +2,7 @@ use crate::bus::{InterruptBus, MemorySystem};
 use crate::cpu::Cpu;
 use crate::debug::breakpoint::BreakpointManager;
 use crate::ppu::Ppu;
+use crate::timer::Timer;
 use log::info;
 use std::error::Error;
 use std::path::Path;
@@ -11,6 +12,7 @@ pub struct Machine {
     cpu: Cpu,
     bus: MemorySystem,
     ppu: Ppu,
+    timer: Timer,
     start_addr: Option<u16>,
     breakpoint_manager: BreakpointManager,
 }
@@ -56,11 +58,12 @@ impl Machine {
             }
         }
 
-        Ok((total_cycles, break_flag))
+        Ok((total_cycles as usize, break_flag))
     }
 
-    pub fn step(&mut self) -> Result<usize, Box<dyn Error>> {
+    pub fn step(&mut self) -> Result<u8, Box<dyn Error>> {
         let cycles = self.cpu.step(&mut self.bus)?;
+        self.timer.step(&mut self.bus, cycles);
         self.ppu.update(&mut self.bus, cycles as u32);
 
         Ok(cycles)
@@ -73,6 +76,7 @@ impl Machine {
         if let Some(addr) = self.start_addr {
             self.cpu.set_pc(addr);
         }
+        self.timer.reset(&mut self.bus);
         self.ppu.reset(&mut self.bus);
 
         self.bus.set_interrupt_enable_u8(0x00);

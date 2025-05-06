@@ -4,6 +4,7 @@ pub(crate) mod debug;
 pub(crate) mod machine;
 pub(crate) mod ppu;
 mod tests;
+mod timer;
 
 pub use cpu::Cpu;
 pub use cpu::Flags as CpuFlags;
