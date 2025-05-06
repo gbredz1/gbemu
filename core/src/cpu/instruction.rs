@@ -629,10 +629,9 @@ impl Instruction {
             }
             BIT(n, op) => {
                 let val = read_operand_value_u8!(cpu, bus, data, op);
-                let result = val & (1 << n);
-                write_to_operand_u8!(cpu, bus, data, op, result);
+                let bit = val & (1 << n) == 0;
 
-                cpu.set_flag_if(Flags::Z, result == 0);
+                cpu.set_flag_if(Flags::Z, bit);
                 cpu.clear_flag(Flags::N);
                 cpu.set_flag(Flags::H);
 

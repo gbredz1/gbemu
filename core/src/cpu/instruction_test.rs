@@ -597,4 +597,83 @@ mod tests {
             .set(B(0b1010_1010))
             .check_result(0b0101_0101, f!(0, 0, 0, 0), out8!("b"));
     }
+    #[test]
+    fn test_cb_swap() {
+        let mut m = TestMachine::with_operation_cb(SWAP(z!("B")));
+
+        // Test basic swap
+        m.clear_flags()
+            .set(B(0x12))
+            .check_result(0x21, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test zero result
+        m.clear_flags()
+            .set(B(0x00))
+            .check_result(0x00, f!(1, 0, 0, 0), out8!("b"));
+
+        // Test swap preserving all bits
+        m.clear_flags()
+            .set(B(0xF0))
+            .check_result(0x0F, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test full byte swap
+        m.clear_flags()
+            .set(B(0xAB))
+            .check_result(0xBA, f!(0, 0, 0, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_bit() {
+        let mut m = TestMachine::with_operation_cb(BIT(7, z!("B")));
+
+        // Test when bit is set
+        m.clear_flags()
+            .set(B(0b1100_0001))
+            .check_result(0b1100_0001, f!(0, 0, 1, 0), out8!("b"));
+
+        // Test when bit is not set
+        m.clear_flags()
+            .set(B(0b0100_0000))
+            .check_result(0b0100_0000, f!(1, 0, 1, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_res() {
+        let mut m = TestMachine::with_operation_cb(RES(0, z!("B")));
+
+        // Test resetting bit that is set
+        m.clear_flags()
+            .set(B(0b0000_0001))
+            .check_result(0b0000_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test resetting bit that is already reset
+        m.clear_flags()
+            .set(B(0b1111_1110))
+            .check_result(0b1111_1110, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test resetting bit preserves other bits
+        m.clear_flags()
+            .set(B(0b1111_1111))
+            .check_result(0b1111_1110, f!(0, 0, 0, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_set() {
+        let mut m = TestMachine::with_operation_cb(SET(0, z!("B")));
+
+        // Test setting bit that is reset
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0001, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test setting bit that is already set
+        m.clear_flags()
+            .set(B(0b0000_0001))
+            .check_result(0b0000_0001, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test setting bit preserves other bits
+        m.clear_flags()
+            .set(B(0b1111_1110))
+            .check_result(0b1111_1111, f!(0, 0, 0, 0), out8!("b"));
+    }
 }
