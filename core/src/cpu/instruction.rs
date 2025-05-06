@@ -481,7 +481,7 @@ impl Instruction {
                 self.cycles
             }
             CCF => {
-                let  c = cpu.flag(Flags::C);
+                let c = cpu.flag(Flags::C);
                 cpu.clear_flag(Flags::N | Flags::H);
                 cpu.set_flag_if(Flags::C, !c); // Complement C flag
                 self.cycles
@@ -615,7 +615,7 @@ impl Instruction {
         }
     }
 
-    pub fn execute_cb(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: Vec<u8>) -> usize {
+    pub fn execute_cb(&self, cpu: &mut Cpu, bus: &mut impl CpuBus, data: &[u8]) -> usize {
         match self.operation {
             SWAP(op) => {
                 let val = read_operand_value_u8!(cpu, bus, data, op);
@@ -659,7 +659,7 @@ impl Instruction {
 
                 cpu.set_flag_if(Flags::Z, result == 0);
                 cpu.clear_flag(Flags::N | Flags::H);
-                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
+                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
 
                 self.cycles
             }
@@ -670,7 +670,7 @@ impl Instruction {
 
                 cpu.set_flag_if(Flags::Z, result == 0);
                 cpu.clear_flag(Flags::N | Flags::H);
-                cpu.set_flag_if(Flags::C, val & 0x80 != 0);
+                cpu.set_flag_if(Flags::C, val & 0x01 != 0);
 
                 self.cycles
             }
@@ -709,7 +709,7 @@ impl Instruction {
             }
             SRA(op) => {
                 let val = read_operand_value_u8!(cpu, bus, data, op);
-                let result = val >> 1 | (val & 0x01) << 7;
+                let result = val >> 1 | val & 0x80;
                 write_to_operand_u8!(cpu, bus, data, op, result);
 
                 cpu.set_flag_if(Flags::Z, result == 0);

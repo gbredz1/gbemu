@@ -22,6 +22,7 @@ mod tests {
         ($o:expr) => {
             match $o {
                 "a" => |m: &TestMachine| m.cpu.a(),
+                "b" => |m: &TestMachine| m.cpu.b(),
                 _ => panic!("Invalid"),
             }
         };
@@ -47,10 +48,12 @@ mod tests {
         bus: TestBus,
         instr: Instruction,
         data: Vec<u8>,
+        cb_instr: bool,
     }
 
     enum Value {
         A(u8),
+        B(u8),
         SP(u16),
         HL(u16),
     }
@@ -62,6 +65,16 @@ mod tests {
                 bus: TestBus::default(),
                 instr: Instruction::from(operation, 0, 0, 0),
                 data: vec![],
+                cb_instr: false,
+            }
+        }
+        fn with_operation_cb(operation: Operation) -> Self {
+            Self {
+                cpu: Cpu::default(),
+                bus: TestBus::default(),
+                instr: Instruction::from(operation, 0, 0, 0),
+                data: vec![],
+                cb_instr: true,
             }
         }
 
@@ -83,6 +96,7 @@ mod tests {
         fn set(&mut self, value: Value) -> &mut Self {
             match value {
                 A(val) => self.cpu.set_a(val),
+                B(val) => self.cpu.set_b(val),
                 SP(val) => self.cpu.set_sp(val),
                 HL(val) => self.cpu.set_hl(val),
             };
@@ -90,8 +104,13 @@ mod tests {
         }
 
         fn run(&mut self) -> &mut Self {
-            self.instr.execute(&mut self.cpu, &mut self.bus, &self.data);
+            if self.cb_instr {
+                self.instr.execute_cb(&mut self.cpu, &mut self.bus, &self.data);
+            } else {
+                self.instr.execute(&mut self.cpu, &mut self.bus, &self.data);
+            }
             self.data = vec![]; // Reset data
+
             self
         }
 
@@ -235,14 +254,10 @@ mod tests {
         m.clear_flags().check_flags(f!(0, 0, 0, 1));
 
         // Case 2: Carry flag is set, should be unset
-        m.clear_flags()
-            .set_flags(Flags::C)
-            .check_flags(f!(0, 0, 0, 0));
+        m.clear_flags().set_flags(Flags::C).check_flags(f!(0, 0, 0, 0));
 
         // Case 3: Z flag should remain unchanged when set
-        m.clear_flags()
-            .set_flags(Flags::Z)
-            .check_flags(f!(1, 0, 0, 1));
+        m.clear_flags().set_flags(Flags::Z).check_flags(f!(1, 0, 0, 1));
 
         // Case 4: Z flag should remain unchanged when set with C
         m.clear_flags()
@@ -403,5 +418,183 @@ mod tests {
             .check_flags(f!(0, 0, 1, 1));
         assert_eq!(0x0000, m.cpu.hl());
         assert_eq!(0x00FF, m.cpu.sp());
+    }
+
+    #[test]
+    fn test_cb_rlc() {
+        let mut m = TestMachine::with_operation_cb(RLC(z!("B")));
+
+        // Test basic rotation without carry
+        m.clear_flags()
+            .set(B(0b0100_0000))
+            .check_result(0b1000_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test rotation with carry set
+        m.clear_flags()
+            .set(B(0b1000_0000))
+            .check_result(0b0000_0001, f!(0, 0, 0, 1), out8!("b"));
+
+        // Test zero result
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 0), out8!("b"));
+
+        // Test rotation preserving bits
+        m.clear_flags()
+            .set(B(0b1010_1010))
+            .check_result(0b0101_0101, f!(0, 0, 0, 1), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_rrc() {
+        let mut m = TestMachine::with_operation_cb(RRC(z!("B")));
+
+        // Test basic rotation without carry
+        m.clear_flags()
+            .set(B(0b0100_0000))
+            .check_result(0b0010_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test rotation with carry set
+        m.clear_flags()
+            .set(B(0b0000_0001))
+            .check_result(0b1000_0000, f!(0, 0, 0, 1), out8!("b"));
+
+        // Test zero result
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 0), out8!("b"));
+
+        // Test rotation preserving bits
+        m.clear_flags()
+            .set(B(0b0101_0101))
+            .check_result(0b101_01010, f!(0, 0, 0, 1), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_rl() {
+        let mut m = TestMachine::with_operation_cb(RL(z!("B")));
+
+        // Test basic rotation without carry
+        m.clear_flags()
+            .set(B(0b0100_0000))
+            .check_result(0b1000_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test rotation with previous carry
+        m.clear_flags()
+            .set_flags(Flags::C)
+            .set(B(0b0100_0000))
+            .check_result(0b1000_0001, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test rotation setting carry
+        m.clear_flags()
+            .set(B(0b1000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 1), out8!("b"));
+
+        // Test zero result without carry
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_rr() {
+        let mut m = TestMachine::with_operation_cb(RR(z!("B")));
+
+        // Test basic rotation without carry
+        m.clear_flags()
+            .set(B(0b0000_0010))
+            .check_result(0b0000_0001, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test rotation with previous carry
+        m.clear_flags()
+            .set_flags(Flags::C)
+            .set(B(0b0000_0010))
+            .check_result(0b1000_0001, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test rotation setting carry
+        m.clear_flags()
+            .set(B(0b0000_0001))
+            .check_result(0b0000_0000, f!(1, 0, 0, 1), out8!("b"));
+
+        // Test zero result without carry
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_sla() {
+        let mut m = TestMachine::with_operation_cb(SLA(z!("B")));
+
+        // Test basic shift left
+        m.clear_flags()
+            .set(B(0b0100_0000))
+            .check_result(0b1000_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test shift left with carry
+        m.clear_flags()
+            .set(B(0b1000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 1), out8!("b"));
+
+        // Test zero result
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 0), out8!("b"));
+
+        // Test shift preserving bits
+        m.clear_flags()
+            .set(B(0b0101_0101))
+            .check_result(0b1010_1010, f!(0, 0, 0, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_sra() {
+        let mut m = TestMachine::with_operation_cb(SRA(z!("B")));
+
+        // Test basic shift right preserving sign bit
+        m.clear_flags()
+            .set(B(0b1100_0000))
+            .check_result(0b1110_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test shift right with carry
+        m.clear_flags()
+            .set_flags(Flags::C)
+            .set(B(0b0000_0001))
+            .check_result(0b0000_0000, f!(1, 0, 0, 1), out8!("b"));
+
+        // Test shift right preserving sign bit (negative)
+        m.clear_flags()
+            .set(B(0b1000_0001))
+            .check_result(0b1100_0000, f!(0, 0, 0, 1), out8!("b"));
+
+        // Test shift right preserving sign bit (positive)
+        m.clear_flags()
+            .set(B(0b0100_0001))
+            .check_result(0b0010_0000, f!(0, 0, 0, 1), out8!("b"));
+    }
+
+    #[test]
+    fn test_cb_srl() {
+        let mut m = TestMachine::with_operation_cb(SRL(z!("B")));
+
+        // Test basic shift right
+        m.clear_flags()
+            .set(B(0b1100_0000))
+            .check_result(0b0110_0000, f!(0, 0, 0, 0), out8!("b"));
+
+        // Test shift right with carry
+        m.clear_flags()
+            .set(B(0b0000_0001))
+            .check_result(0b0000_0000, f!(1, 0, 0, 1), out8!("b"));
+
+        // Test zero result
+        m.clear_flags()
+            .set(B(0b0000_0000))
+            .check_result(0b0000_0000, f!(1, 0, 0, 0), out8!("b"));
+
+        // Test shift preserving bits
+        m.clear_flags()
+            .set(B(0b1010_1010))
+            .check_result(0b0101_0101, f!(0, 0, 0, 0), out8!("b"));
     }
 }

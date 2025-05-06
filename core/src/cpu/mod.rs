@@ -102,7 +102,7 @@ impl Cpu {
         };
 
         let data = vec![]; // all cb instruction size = 1
-        Ok(instruction.execute_cb(self, bus, data))
+        Ok(instruction.execute_cb(self, bus, &data))
     }
 
     pub fn reset(&mut self) {
