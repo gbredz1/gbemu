@@ -1,7 +1,7 @@
 use crate::cpu::CpuBus;
 use crate::ppu::PpuBus;
 use bitflags::bitflags;
-use log::error;
+use log::{debug, error};
 use std::default::Default;
 use std::fs::File;
 use std::io::Read;
@@ -138,6 +138,11 @@ impl MemorySystem {
         } else {
             unsafe {
                 *self.memory.get_unchecked_mut(address as usize) = byte;
+            }
+
+            if self.boot_rom_enabled && address == 0xFF50 {
+                self.boot_rom_enabled = false;
+                debug!("Boot rom disabled (${byte:02x})");
             }
         }
     }

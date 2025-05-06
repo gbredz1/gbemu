@@ -1,6 +1,7 @@
 /target
 /roms
 /docs
+.run/
 .idea/
 .vscode/
 .env
