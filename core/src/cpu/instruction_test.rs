@@ -4,6 +4,7 @@ mod tests {
     use crate::cpu::addressing_mode::{Op, Reg};
     use crate::cpu::instruction::Operation::*;
     use crate::cpu::instruction::{Instruction, Operation};
+    use crate::cpu::instruction_test::tests::Value::*;
     use crate::tests::bus::TestBus;
     use crate::{Cpu, z};
 
@@ -17,10 +18,18 @@ mod tests {
             }
         };
     }
-    macro_rules! output {
+    macro_rules! out8 {
         ($o:expr) => {
             match $o {
                 "a" => |m: &TestMachine| m.cpu.a(),
+                _ => panic!("Invalid"),
+            }
+        };
+    }
+    macro_rules! out16 {
+        ($o:expr) => {
+            match $o {
+                "sp" => |m: &TestMachine| m.cpu.sp(),
                 _ => panic!("Invalid"),
             }
         };
@@ -37,6 +46,13 @@ mod tests {
         cpu: Cpu,
         bus: TestBus,
         instr: Instruction,
+        data: Vec<u8>,
+    }
+
+    enum Value {
+        A(u8),
+        SP(u16),
+        HL(u16),
     }
 
     impl TestMachine {
@@ -45,6 +61,7 @@ mod tests {
                 cpu: Cpu::default(),
                 bus: TestBus::default(),
                 instr: Instruction::from(operation, 0, 0, 0),
+                data: vec![],
             }
         }
 
@@ -58,40 +75,51 @@ mod tests {
             self
         }
 
-        fn run(&mut self, data: Vec<u8>) -> &mut Self {
-            self.instr.execute(&mut self.cpu, &mut self.bus, &data);
+        fn set_data(&mut self, data: &[u8]) -> &mut Self {
+            self.data = Vec::from(data);
             self
         }
 
-        fn check_flags(&mut self, op1: u8, op2: u8, expected_flags: FlagsTest) {
-            self.cpu.set_a(op1);
-            self.run(vec![op2]);
+        fn set(&mut self, value: Value) -> &mut Self {
+            match value {
+                A(val) => self.cpu.set_a(val),
+                SP(val) => self.cpu.set_sp(val),
+                HL(val) => self.cpu.set_hl(val),
+            };
+            self
+        }
 
-            self.assert_flags(Flags::Z, expected_flags.z);
-            self.assert_flags(Flags::N, expected_flags.n);
-            self.assert_flags(Flags::H, expected_flags.h);
-            self.assert_flags(Flags::C, expected_flags.c);
+        fn run(&mut self) -> &mut Self {
+            self.instr.execute(&mut self.cpu, &mut self.bus, &self.data);
+            self.data = vec![]; // Reset data
+            self
+        }
+
+        fn assert_flags(&mut self, expected_flags: FlagsTest) -> &mut Self {
+            assert_eq!(self.cpu.flag(Flags::Z), expected_flags.z, "Z flag incorrect");
+            assert_eq!(self.cpu.flag(Flags::N), expected_flags.n, "N flag incorrect");
+            assert_eq!(self.cpu.flag(Flags::H), expected_flags.h, "H flag incorrect");
+            assert_eq!(self.cpu.flag(Flags::C), expected_flags.c, "C flag incorrect");
+            self
+        }
+
+        fn check_flags(&mut self, expected_flags: FlagsTest) {
+            self.run().assert_flags(expected_flags);
         }
 
         fn check_result<T: PartialEq + std::fmt::Debug + std::fmt::LowerHex>(
             &mut self,
-            op1_val: u8,
-            op2_val: u8,
             expected_result: T,
             expected_flags: FlagsTest,
             output: impl FnOnce(&Self) -> T,
         ) {
-            self.check_flags(op1_val, op2_val, expected_flags);
+            self.run().assert_flags(expected_flags);
             let output_val = output(self);
             assert_eq!(
                 output_val, expected_result,
                 "Result incorrect : 0x{:x} != 0x{:x}",
                 output_val, expected_result
             );
-        }
-
-        fn assert_flags(&self, flags: Flags, expected_value: bool) {
-            assert_eq!(self.cpu.flag(flags), expected_value, "flag {:?} incorrect", flags);
         }
     }
 
@@ -100,20 +128,30 @@ mod tests {
         let mut m = TestMachine::with_operation(CP(z!("n")));
 
         // Test zero flag (A == n)
-        m.clear_flags();
-        m.check_flags(0x42, 0x42, f!(1, 1, 0, 0));
+        m.clear_flags()
+            .set(A(0x42))
+            .set_data(&[0x42])
+            .check_flags(f!(1, 1, 0, 0));
         // Test non-zero result (A > n)
-        m.clear_flags();
-        m.check_flags(0b1000_0000, 0b0001_0000, f!(0, 1, 0, 0));
+        m.clear_flags()
+            .set(A(0b1000_0000))
+            .set_data(&[0b0001_0000])
+            .check_flags(f!(0, 1, 0, 0));
         // Test half carry (A & 0x0F < n & 0x0F)
-        m.clear_flags();
-        m.check_flags(0b0001_0000, 0b0000_0001, f!(0, 1, 1, 0));
+        m.clear_flags()
+            .set(A(0b0001_0000))
+            .set_data(&[0b0000_0001])
+            .check_flags(f!(0, 1, 1, 0));
         // Test carry flag (A < n) = 0b1111_1111
-        m.clear_flags();
-        m.check_flags(0b0000_0001, 0b0000_0010, f!(0, 1, 1, 1));
+        m.clear_flags()
+            .set(A(0b0000_0001))
+            .set_data(&[0b0000_0010])
+            .check_flags(f!(0, 1, 1, 1));
         // Test carry flag (A < n) = 0b1111_0000
-        m.clear_flags();
-        m.check_flags(0b0000_0000, 0b0001_0000, f!(0, 1, 0, 1));
+        m.clear_flags()
+            .set(A(0b0000_0000))
+            .set_data(&[0b0001_0000])
+            .check_flags(f!(0, 1, 0, 1));
     }
 
     #[test]
@@ -121,15 +159,30 @@ mod tests {
         let mut m = TestMachine::with_operation(SUB(z!("n")));
 
         // Test zero flag (A == n)
-        m.check_result(0x42, 0x42, 0x00, f!(1, 1, 0, 0), |m| m.cpu.a());
+        m.clear_flags()
+            .set(A(0x42))
+            .set_data(&[0x42])
+            .check_result(0x00, f!(1, 1, 0, 0), out8!("a"));
         // Test non-zero result (A > n)
-        m.check_result(0b1000_0000, 0b0001_0000, 0b0111_0000, f!(0, 1, 0, 0), |m| m.cpu.a());
+        m.clear_flags()
+            .set(A(0b1000_0000))
+            .set_data(&[0b0001_0000])
+            .check_result(0b0111_0000, f!(0, 1, 0, 0), out8!("a"));
         // Test half carry (A & 0x0F < n & 0x0F)
-        m.check_result(0b0001_0000, 0b0000_0001, 0b0000_1111, f!(0, 1, 1, 0), |m| m.cpu.a());
+        m.clear_flags()
+            .set(A(0b0001_0000))
+            .set_data(&[0b0000_0001])
+            .check_result(0b0000_1111, f!(0, 1, 1, 0), out8!("a"));
         // Test carry flag (A < n) = 0b1111_1111
-        m.check_result(0b0000_0001, 0b0000_0010, 0b1111_1111, f!(0, 1, 1, 1), |m| m.cpu.a());
+        m.clear_flags()
+            .set(A(0b0000_0001))
+            .set_data(&[0b0000_0010])
+            .check_result(0b1111_1111, f!(0, 1, 1, 1), out8!("a"));
         // Test carry flag (A < n) = 0b1111_0000
-        m.check_result(0b0000_0000, 0b0001_0000, 0b1111_0000, f!(0, 1, 0, 1), |m| m.cpu.a());
+        m.clear_flags()
+            .set(A(0b0000_0000))
+            .set_data(&[0b0001_0000])
+            .check_result(0b1111_0000, f!(0, 1, 0, 1), out8!("a"));
     }
 
     #[test]
@@ -137,20 +190,30 @@ mod tests {
         let mut m = TestMachine::with_operation(ADD(z!("A"), z!("n")));
 
         // Test zero flag (A == n)
-        m.clear_flags();
-        m.check_result(0x00, 0x00, 0x00, f!(1, 0, 0, 0), output!("a"));
+        m.clear_flags()
+            .set(A(0x00))
+            .set_data(&[0x00])
+            .check_result(0x00, f!(1, 0, 0, 0), out8!("a"));
         // Test non-zero result (A + n < 256)
-        m.clear_flags();
-        m.check_result(0b1000_0000, 0b0001_0000, 0b1001_0000, f!(0, 0, 0, 0), output!("a"));
+        m.clear_flags()
+            .set(A(0b1000_0000))
+            .set_data(&[0b0001_0000])
+            .check_result(0b1001_0000, f!(0, 0, 0, 0), out8!("a"));
         // Test half carry
-        m.clear_flags();
-        m.check_result(0b0000_1111, 0b0000_0001, 0b0001_0000, f!(0, 0, 1, 0), output!("a"));
+        m.clear_flags()
+            .set(A(0b0000_1111))
+            .set_data(&[0b0000_0001])
+            .check_result(0b0001_0000, f!(0, 0, 1, 0), out8!("a"));
         // Test carry flag
-        m.clear_flags();
-        m.check_result(0b1111_0000, 0b0001_0010, 0b0000_0010, f!(0, 0, 0, 1), output!("a"));
+        m.clear_flags()
+            .set(A(0b1111_0000))
+            .set_data(&[0b0001_0010])
+            .check_result(0b0000_0010, f!(0, 0, 0, 1), out8!("a"));
         // Test carry and half flags
-        m.clear_flags();
-        m.check_result(0b1100_1100, 0b0111_0111, 0b0100_0011, f!(0, 0, 1, 1), output!("a"));
+        m.clear_flags()
+            .set(A(0b1100_1100))
+            .set_data(&[0b0111_0111])
+            .check_result(0b0100_0011, f!(0, 0, 1, 1), out8!("a"));
     }
 
     #[test]
@@ -158,18 +221,10 @@ mod tests {
         let mut m = TestMachine::with_operation(SCF);
 
         // Case 1: All flags are erased.
-        m.clear_flags().run(vec![]);
-        m.assert_flags(Flags::Z, false);
-        m.assert_flags(Flags::N, false);
-        m.assert_flags(Flags::H, false);
-        m.assert_flags(Flags::C, true);
+        m.clear_flags().run().check_flags(f!(0, 0, 0, 1));
 
         // Case 2: The Z flag is active
-        m.clear_flags().set_flags(Flags::Z).run(vec![]);
-        m.assert_flags(Flags::Z, true);
-        m.assert_flags(Flags::N, false);
-        m.assert_flags(Flags::H, false);
-        m.assert_flags(Flags::C, true);
+        m.clear_flags().set_flags(Flags::Z).run().check_flags(f!(1, 0, 0, 1));
     }
 
     #[test]
@@ -179,49 +234,151 @@ mod tests {
         // --- Tests after addition (N=0) ---
 
         // Normal case (without adjustment)
-        m.clear_flags();
-        m.check_result(0x45, 0x00, 0x45, f!(0, 0, 0, 0), output!("a"));
+        m.clear_flags()
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0x45, f!(0, 0, 0, 0), out8!("a"));
 
         // Lower nibble value > 9
-        m.clear_flags();
-        m.check_result(0x4A, 0x00, 0x50, f!(0, 0, 0, 0), output!("a"));
+        m.clear_flags()
+            .set(A(0x4A))
+            .set_data(&[0x00])
+            .check_result(0x50, f!(0, 0, 0, 0), out8!("a"));
 
         // Case with H flag defined
-        m.clear_flags().set_flags(Flags::H);
-        m.check_result(0x45, 0x00, 0x4b, f!(0, 0, 0, 0), output!("a"));
+        m.clear_flags()
+            .set_flags(Flags::H)
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0x4b, f!(0, 0, 0, 0), out8!("a"));
 
         // Case with value > 0x99
-        m.clear_flags();
-        m.check_result(0xA5, 0x00, 0x05, f!(0, 0, 0, 1), output!("a"));
+        m.clear_flags()
+            .set(A(0xA5))
+            .set_data(&[0x00])
+            .check_result(0x05, f!(0, 0, 0, 1), out8!("a"));
 
         // Case with C flag set
-        m.clear_flags().set_flags(Flags::C);
-        m.check_result(0x45, 0x00, 0xA5, f!(0, 0, 0, 1), output!("a"));
+        m.clear_flags()
+            .set_flags(Flags::C)
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0xA5, f!(0, 0, 0, 1), out8!("a"));
 
         // Special case - zero result
-        m.clear_flags();
-        m.check_result(0x00, 0x00, 0x00, f!(1, 0, 0, 0), output!("a"));
+        m.clear_flags()
+            .set(A(0x00))
+            .set_data(&[0x00])
+            .check_result(0x00, f!(1, 0, 0, 0), out8!("a"));
 
         // Special case - result 0x9A becoming 0x00 with carry
-        m.clear_flags();
-        m.check_result(0x9A, 0x00, 0x00, f!(1, 0, 0, 1), output!("a"));
+        m.clear_flags()
+            .set(A(0x9A))
+            .set_data(&[0x00])
+            .check_result(0x00, f!(1, 0, 0, 1), out8!("a"));
 
         // --- Tests after subtraction (N=1) ---
 
         // Normal case (without adjustment)
-        m.clear_flags().set_flags(Flags::N);
-        m.check_result(0x45, 0x00, 0x45, f!(0, 1, 0, 0), output!("a"));
+        m.clear_flags()
+            .set_flags(Flags::N)
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0x45, f!(0, 1, 0, 0), out8!("a"));
 
         // Case with H flag defined
-        m.clear_flags().set_flags(Flags::N | Flags::H);
-        m.check_result(0x45, 0x00, 0x3F, f!(0, 1, 0, 0), output!("a"));
+        m.clear_flags()
+            .set_flags(Flags::N | Flags::H)
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0x3F, f!(0, 1, 0, 0), out8!("a"));
 
         // Case with flag C defined
-        m.clear_flags().set_flags(Flags::N | Flags::C);
-        m.check_result(0x45, 0x00, 0xE5, f!(0, 1, 0, 1), output!("a"));
+        m.clear_flags()
+            .set_flags(Flags::N | Flags::C)
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0xE5, f!(0, 1, 0, 1), out8!("a"));
 
         // Case with H and C flags set
-        m.clear_flags().set_flags(Flags::N | Flags::H | Flags::C);
-        m.check_result(0x45, 0x00, 0xDF, f!(0, 1, 0, 1), output!("a"));
+        m.clear_flags()
+            .set_flags(Flags::N | Flags::H | Flags::C)
+            .set(A(0x45))
+            .set_data(&[0x00])
+            .check_result(0xDF, f!(0, 1, 0, 1), out8!("a"));
+    }
+
+    #[test]
+    fn test_add_sp_plus_e() {
+        let mut m = TestMachine::with_operation(ADD(z!("SP"), z!("e")));
+
+        // Test normal addition (no flags)
+        m.clear_flags()
+            .set(SP(0x1000))
+            .set_data(&[0x01])
+            .check_result(0x1001, f!(0, 0, 0, 0), out16!("sp"));
+
+        // Test half carry flag
+        m.clear_flags()
+            .set(SP(0x000F))
+            .set_data(&[0x01])
+            .check_result(0x0010, f!(0, 0, 1, 0), out16!("sp"));
+
+        // Test carry flag
+        m.clear_flags()
+            .set(SP(0x00F0))
+            .set_data(&[0x10])
+            .check_result(0x0100, f!(0, 0, 0, 1), out16!("sp"));
+
+        // Test negative offset
+        m.clear_flags()
+            .set(SP(0x1000))
+            .set_data(&[0xFF]) // -1 in two's complement
+            .check_result(0x0FFF, f!(0, 0, 0, 0), out16!("sp"));
+        m.clear_flags()
+            .set(SP(0x0000))
+            .set_data(&[0x80])
+            .check_result(0xff80, f!(0, 0, 0, 0), out16!("sp"));
+    }
+
+    #[test]
+    fn test_ld_hl_sp_plus_e() {
+        let mut m = TestMachine::with_operation(ADD(z!("HL"), z!("SP+e")));
+
+        // Test zero offset
+        m.clear_flags()
+            .set(HL(0x0000))
+            .set(SP(0x1000))
+            .set_data(&[0x00])
+            .check_flags(f!(0, 0, 0, 0));
+        assert_eq!(0x1000, m.cpu.hl());
+        assert_eq!(0x1000, m.cpu.sp());
+
+        // Test positive offset with half carry
+        m.clear_flags()
+            .set(HL(0x0FF0))
+            .set(SP(0xA000))
+            .set_data(&[0x10])
+            .check_flags(f!(0, 0, 1, 0));
+        assert_eq!(0xB000, m.cpu.hl());
+        assert_eq!(0xA000, m.cpu.sp());
+
+        // Test positive offset with carry
+        m.clear_flags()
+            .set(HL(0xF000))
+            .set(SP(0x0FF0))
+            .set_data(&[0x10])
+            .check_flags(f!(0, 0, 0, 1));
+        assert_eq!(0x0000, m.cpu.hl());
+        assert_eq!(0x0FF0, m.cpu.sp());
+
+        // Test positive offset with both carries
+        m.clear_flags()
+            .set(HL(0xFF00))
+            .set(SP(0x00FF))
+            .set_data(&[0x01])
+            .check_flags(f!(0, 0, 1, 1));
+        assert_eq!(0x0000, m.cpu.hl());
+        assert_eq!(0x00FF, m.cpu.sp());
     }
 }

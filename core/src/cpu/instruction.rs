@@ -338,18 +338,17 @@ impl Instruction {
                     },
                     {
                         // 16-bits
-                        let val1 = read_operand_value_u16!(cpu, bus, data, op1);
-
-                        if op2 == z!("e") {
-                            let val2 = read_operand_value_u8!(cpu, bus, data, op2) as i16;
-                            let (result, carry) = val1.overflowing_add_signed(val2);
-                            write_to_operand_u16!(cpu, bus, data, op1, result);
+                        if op1 == z!("SP") && op2 == z!("e") {
+                            let e = data[0] as i8 as u16;
+                            let sp = cpu.sp();
+                            cpu.set_sp(sp.wrapping_add(e));
 
                             cpu.clear_flag(Flags::Z);
                             cpu.clear_flag(Flags::N);
-                            cpu.set_flag_if(Flags::H, (val1 & 0x0F) + (val2 as u16 & 0x0F) > 0x0F);
-                            cpu.set_flag_if(Flags::C, carry);
+                            cpu.set_flag_if(Flags::H, (sp & 0x0F) + (e & 0x0F) > 0xF);
+                            cpu.set_flag_if(Flags::C, (sp & 0x00FF) + (e & 0x00FF) > 0xFF);
                         } else {
+                            let val1 = read_operand_value_u16!(cpu, bus, data, op1);
                             let val2 = read_operand_value_u16!(cpu, bus, data, op2);
                             let (result, carry) = val1.overflowing_add(val2);
                             write_to_operand_u16!(cpu, bus, data, op1, result);
@@ -553,17 +552,21 @@ impl Instruction {
                 match_size!(
                     op2,
                     {
-                        let val_u8 = read_operand_value_u8!(cpu, bus, data, op2);
-                        write_to_operand_u8!(cpu, bus, data, op1, val_u8);
+                        let val2 = read_operand_value_u8!(cpu, bus, data, op2);
+                        write_to_operand_u8!(cpu, bus, data, op1, val2);
                     },
                     {
-                        let val_u16 = read_operand_value_u16!(cpu, bus, data, op2);
-                        write_to_operand_u16!(cpu, bus, data, op1, val_u16);
-
                         if op1 == z!("HL") && op2 == z!("SP+e") {
+                            let sp = cpu.sp();
+                            let e = data[0] as i8 as u16;
+                            cpu.set_hl(sp.wrapping_add(e));
+
                             cpu.clear_flag(Flags::Z | Flags::N);
-                            cpu.set_flag_if(Flags::H, val_u16 & 0x08 != 0);
-                            cpu.set_flag_if(Flags::C, val_u16 & 0x80 != 0);
+                            cpu.set_flag_if(Flags::H, (sp & 0x0F) + (e & 0x0F) > 0xF);
+                            cpu.set_flag_if(Flags::C, (sp & 0x00FF) + (e & 0x00FF) > 0xFF);
+                        } else {
+                            let val2 = read_operand_value_u16!(cpu, bus, data, op2);
+                            write_to_operand_u16!(cpu, bus, data, op1, val2);
                         }
                     }
                 );
