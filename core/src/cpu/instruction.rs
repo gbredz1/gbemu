@@ -480,7 +480,12 @@ impl Instruction {
                 cpu.set_flag(Flags::C);
                 self.cycles
             }
-
+            CCF => {
+                let  c = cpu.flag(Flags::C);
+                cpu.clear_flag(Flags::N | Flags::H);
+                cpu.set_flag_if(Flags::C, !c); // Complement C flag
+                self.cycles
+            }
             DAA => {
                 let n = cpu.flag(Flags::N);
                 let h = cpu.flag(Flags::H);

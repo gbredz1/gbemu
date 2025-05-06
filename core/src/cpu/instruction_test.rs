@@ -221,10 +221,33 @@ mod tests {
         let mut m = TestMachine::with_operation(SCF);
 
         // Case 1: All flags are erased.
-        m.clear_flags().run().check_flags(f!(0, 0, 0, 1));
+        m.clear_flags().check_flags(f!(0, 0, 0, 1));
 
         // Case 2: The Z flag is active
-        m.clear_flags().set_flags(Flags::Z).run().check_flags(f!(1, 0, 0, 1));
+        m.clear_flags().set_flags(Flags::Z).check_flags(f!(1, 0, 0, 1));
+    }
+
+    #[test]
+    fn test_ccf() {
+        let mut m = TestMachine::with_operation(CCF);
+
+        // Case 1: Carry flag is unset, should be set
+        m.clear_flags().check_flags(f!(0, 0, 0, 1));
+
+        // Case 2: Carry flag is set, should be unset
+        m.clear_flags()
+            .set_flags(Flags::C)
+            .check_flags(f!(0, 0, 0, 0));
+
+        // Case 3: Z flag should remain unchanged when set
+        m.clear_flags()
+            .set_flags(Flags::Z)
+            .check_flags(f!(1, 0, 0, 1));
+
+        // Case 4: Z flag should remain unchanged when set with C
+        m.clear_flags()
+            .set_flags(Flags::Z | Flags::C)
+            .check_flags(f!(1, 0, 0, 0));
     }
 
     #[test]
