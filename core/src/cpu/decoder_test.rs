@@ -86,7 +86,7 @@ mod tests {
 
     const INVALID_OPCODE_DESC: &str = "Invalid opcode";
     // Format: (opcode, size, cycles, cycles_not_taken)
-    const MAIN_INSTR_SPECS: [(u8, usize, usize, usize, &str); 256] = [
+    const MAIN_INSTR_SPECS: [(u8, u8, u8, u8, &str); 256] = [
         // 0x0X
         (0x00, 1, 4, 0, "NOP"),
         (0x01, 3, 12, 0, "LD BC,nn"),
@@ -335,7 +335,7 @@ mod tests {
         (0xE6, 2, 8, 0, "AND n"),
         (0xE7, 1, 16, 0, "RST 20H"),
         (0xE8, 2, 16, 0, "ADD SP,e"),
-        (0xE9, 1, 4, 0, "JP (HL)"),
+        (0xE9, 1, 4, 0, "JP HL"),
         (0xEA, 3, 16, 0, "LD (nn),A"),
         (0xEB, 1, 0, 0, INVALID_OPCODE_DESC),
         (0xEC, 1, 0, 0, INVALID_OPCODE_DESC),
