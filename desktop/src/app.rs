@@ -7,6 +7,7 @@ use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Subscription, Task, keyboard, time, window};
+use log::error;
 use std::time::{Duration, Instant};
 
 // Application constants
@@ -145,7 +146,11 @@ impl App {
     }
 
     fn do_tick(&mut self) -> Task<Message> {
-        let (cycles, break_flag) = self.machine.step_frame().expect("Failed to update the machine");
+        let (cycles, break_flag) = self.machine.step_frame().unwrap_or_else(|e| {
+            error!("{}", e);
+            self.is_running = false;
+            (0, false)
+        });
         self.total_cycles += cycles as u64;
 
         if break_flag {
@@ -170,8 +175,14 @@ impl App {
     }
     fn do_step_frame(&mut self) -> Task<Message> {
         self.is_running = false;
-        self.total_cycles += self.machine.step_frame().unwrap().0 as u64;
-        Task::none()
+
+        let (cycles, _) = self.machine.step_frame().unwrap_or_else(|e| {
+            error!("{}", e);
+            (0, false)
+        });
+
+        self.total_cycles += cycles as u64;
+        self.update(Message::ScreenView(screen::Message::UpdateFrameBuffer))
     }
     fn do_reset(&mut self) -> Task<Message> {
         self.machine.reset();
