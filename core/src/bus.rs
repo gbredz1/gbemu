@@ -128,7 +128,6 @@ impl MemorySystem {
         Ok(size)
     }
 
-    #[inline(always)]
     pub fn read_byte(&self, address: u16) -> u8 {
         if self.boot_rom_enabled && address < 0x100 {
             unsafe { *self.boot_rom.get_unchecked(address as usize) }
@@ -136,19 +135,30 @@ impl MemorySystem {
             unsafe { *self.memory.get_unchecked(address as usize) }
         }
     }
-    #[inline(always)]
+
     pub fn write_byte(&mut self, address: u16, byte: u8) {
+        if address == 0xFF04 {
+            // TIMER DIV -> write = reset
+            self.write_internal_byte(address, 0x00);
+            return;
+        }
+
         if self.boot_rom_enabled && address < 0x100 {
             error!("Writing to boot rom is not allowed");
         } else {
-            unsafe {
-                *self.memory.get_unchecked_mut(address as usize) = byte;
-            }
+            self.write_internal_byte(address, byte);
 
             if self.boot_rom_enabled && address == 0xFF50 {
                 self.boot_rom_enabled = false;
                 debug!("Boot rom disabled (${byte:02x})");
             }
+        }
+    }
+
+    #[inline(always)]
+    pub fn write_internal_byte(&mut self, address: u16, byte: u8) {
+        unsafe {
+            *self.memory.get_unchecked_mut(address as usize) = byte;
         }
     }
 
@@ -166,6 +176,7 @@ impl MemorySystem {
 pub trait BusIO {
     fn read_byte(&self, address: u16) -> u8;
     fn write_byte(&mut self, address: u16, byte: u8);
+    fn write_internal_byte(&mut self, address: u16, byte: u8);
     fn read_word(&self, address: u16) -> u16;
     fn write_word(&mut self, address: u16, word: u16);
 }
@@ -181,6 +192,10 @@ impl BusIO for MemorySystem {
 
     fn write_byte(&mut self, address: u16, byte: u8) {
         self.write_byte(address, byte)
+    }
+
+    fn write_internal_byte(&mut self, address: u16, byte: u8) {
+        self.write_internal_byte(address, byte)
     }
 
     fn read_word(&self, address: u16) -> u16 {

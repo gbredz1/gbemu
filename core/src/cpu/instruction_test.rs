@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::bus::BusIO;
     use crate::cpu::Flags;
     use crate::cpu::addressing_mode::{Op, Reg};
     use crate::cpu::instruction::Operation::*;
@@ -675,5 +676,65 @@ mod tests {
         m.clear_flags()
             .set(B(0b1111_1110))
             .check_result(0b1111_1111, f!(0, 0, 0, 0), out8!("b"));
+    }
+
+    #[test]
+    fn test_load_a_hl() {
+        let mut m = TestMachine::with_operation(LD(z!("A"), z!("(HL)")));
+
+        m.bus.write_internal_byte(0x1000, 0x42);
+        // Test basic load operation
+        m.clear_flags()
+            .set(A(0x00))
+            .set(HL(0x1000))
+            .check_result(0x42, f!(0, 0, 0, 0), out8!("a"));
+        assert_eq!(0x1000, m.cpu.hl(), "HL should not change");
+
+        // Test that flags are preserved
+        m.bus.write_internal_byte(0x2000, 0x24);
+        m.clear_flags()
+            .set_flags(Flags::Z | Flags::N | Flags::H | Flags::C)
+            .set(A(0x00))
+            .set(HL(0x2000))
+            .check_result(0x24, f!(1, 1, 1, 1), out8!("a"));
+        assert_eq!(0x2000, m.cpu.hl(), "HL should not change");
+
+        let mut m = TestMachine::with_operation(LD(z!("A"), z!("(HL+)")));
+
+        m.bus.write_internal_byte(0x1000, 0x42);
+        // Test basic load operation
+        m.clear_flags()
+            .set(A(0x00))
+            .set(HL(0x1000))
+            .check_result(0x42, f!(0, 0, 0, 0), out8!("a"));
+        assert_eq!(0x1001, m.cpu.hl(), "HL not incremented");
+
+        // Test that flags are preserved
+        m.bus.write_internal_byte(0x2000, 0x24);
+        m.clear_flags()
+            .set_flags(Flags::Z | Flags::N | Flags::H | Flags::C)
+            .set(A(0x00))
+            .set(HL(0x2000))
+            .check_result(0x24, f!(1, 1, 1, 1), out8!("a"));
+        assert_eq!(0x2001, m.cpu.hl(), "HL not incremented");
+
+        let mut m = TestMachine::with_operation(LD(z!("A"), z!("(HL-)")));
+
+        m.bus.write_internal_byte(0x1000, 0x42);
+        // Test basic load operation
+        m.clear_flags()
+            .set(A(0x00))
+            .set(HL(0x1000))
+            .check_result(0x42, f!(0, 0, 0, 0), out8!("a"));
+        assert_eq!(0x0FFF, m.cpu.hl(), "HL not decremented");
+
+        // Test that flags are preserved
+        m.bus.write_internal_byte(0x2000, 0x24);
+        m.clear_flags()
+            .set_flags(Flags::Z | Flags::N | Flags::H | Flags::C)
+            .set(A(0x00))
+            .set(HL(0x2000))
+            .check_result(0x24, f!(1, 1, 1, 1), out8!("a"));
+        assert_eq!(0x1FFF, m.cpu.hl(), "HL not decremented");
     }
 }

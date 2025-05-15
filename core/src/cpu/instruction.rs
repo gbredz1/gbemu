@@ -605,10 +605,14 @@ impl Instruction {
                 self.cycles
             }
             HALT => {
-                cpu.halt();
+                cpu.set_halted(true);
                 self.cycles
             }
-            STOP => self.cycles,
+            STOP => {
+                cpu.set_stopped(true);
+                bus.write_word(0xFF04, 0x00); // reset TIMER DIV
+                self.cycles
+            },
 
             CBPrefix => cpu.fetch_cb_instruction(bus).expect("invalid cb prefix"),
             _ => todo!("not implemented: {}", self.operation),

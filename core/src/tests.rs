@@ -3,8 +3,8 @@ pub(crate) mod bus {
     use crate::bus::{BusIO, InterruptBus};
 
     pub(crate) struct TestBus {
-        memory: [u8; 0x10000],
-        _interrupts: u8,
+        pub memory: [u8; 0x10000],
+        pub _interrupts: u8,
     }
 
     impl Default for TestBus {
@@ -24,6 +24,10 @@ pub(crate) mod bus {
         }
 
         fn write_byte(&mut self, address: u16, byte: u8) {
+            self.memory[address as usize] = byte;
+        }
+
+        fn write_internal_byte(&mut self, address: u16, byte: u8) {
             self.memory[address as usize] = byte;
         }
 

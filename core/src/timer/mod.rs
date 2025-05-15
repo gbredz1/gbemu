@@ -34,11 +34,11 @@ impl Timer {
             return;
         }
 
-        let timer_freq = match (tac.contains(TAC::ClockSelect0), tac.contains(TAC::ClockSelect1)) {
-            (false, true) => 16,    // 262144 Hz
-            (true, false) => 64,    // 65536 Hz
-            (true, true) => 256,    // 16384 Hz
-            (false, false) => 1024, // 4096 Hz
+        let timer_freq = match (tac.contains(TAC::ClockSelect1), tac.contains(TAC::ClockSelect0)) {
+            (false, false) => 256, // 4096 Hz   (00)
+            (false, true) => 4,    // 262144 Hz (01)
+            (true, false) => 16,   // 65536 Hz  (10)
+            (true, true) => 64,    // 16384 Hz  (11)
         };
 
         // Update TIMA according to selected frequency
@@ -47,18 +47,71 @@ impl Timer {
         if self.timer_cycles >= timer_freq {
             self.timer_cycles -= timer_freq;
 
-            // Increment TIMA and check for overflow
-            let (tima, overflow) = bus.tima().overflowing_add(1);
-
-            // If TIMA overflows
-            if overflow {
-                bus.set_tima(bus.tma());
-
-                // Trigger TIMER interrupt
-                bus.set_interrupt_flag(Interrupt::TIMER);
+            let tima = bus.tima();
+            if tima == 0xFF {
+                // Overflow
+                bus.set_tima(bus.tma()); // Set TIMA to TMA
+                bus.set_interrupt_flag(Interrupt::TIMER); // Trigger TIMER interrupt
             } else {
-                bus.set_tima(tima);
+                // Increment TIMA
+                bus.set_tima(tima.wrapping_add(1));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bus::InterruptBus;
+
+    use crate::tests::bus::TestBus;
+
+    impl TimerBus for TestBus {}
+
+    #[test]
+    fn test_div_increment() {
+        let mut timer = Timer::default();
+        let mut bus = TestBus::default();
+
+        timer.step(&mut bus, 255);
+        assert_eq!(bus.div(), 0);
+
+        timer.step(&mut bus, 1);
+        assert_eq!(bus.div(), 1);
+    }
+
+    #[test]
+    fn test_tima_frequencies() {
+        let run_test = |tac: TAC, cycles: usize| {
+            let mut timer = Timer::default();
+            let mut bus = TestBus::default();
+            bus.set_tac(tac);
+            timer.step(&mut bus, (cycles - 1) as u8);
+            assert_eq!(bus.tima(), 0);
+            timer.step(&mut bus, 1);
+            assert_eq!(bus.tima(), 1);
+        };
+
+        run_test(TAC::Enable, 256); // Test 4096 Hz (256 cycles)
+        run_test(TAC::Enable | TAC::ClockSelect0, 4); // Test 262144 Hz (4 cycles)
+        run_test(TAC::Enable | TAC::ClockSelect1, 16); // Test 65536 Hz (16 cycles)
+        run_test(TAC::Enable | TAC::ClockSelect1 | TAC::ClockSelect0, 64); // Test 16384 Hz (64 cycles)
+    }
+
+    #[test]
+    fn test_tima_overflow() {
+        let mut timer = Timer::default();
+        let mut bus = TestBus::default();
+
+        bus.set_tac(TAC::Enable); // Enable timer, freq 00
+        bus.set_tima(0xFF);
+        bus.set_tma(0x42);
+
+        timer.step(&mut bus, 255);
+        assert_eq!(bus.tima(), 0xFF);
+        timer.step(&mut bus, 1);
+        assert_eq!(bus.tima(), 0x42);
+        assert!(bus.interrupt_flag().contains(Interrupt::TIMER));
     }
 }

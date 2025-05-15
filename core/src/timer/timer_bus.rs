@@ -12,8 +12,14 @@ bitflags! {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) trait TimerBus: InterruptBus {
-    define_u8_accessors!(div, 0xFF04);
+    fn div(&self) -> u8 {
+        self.read_byte(0xFF04)
+    }
+    fn set_div(&mut self, byte: u8) {
+        self.write_internal_byte(0xFF04, byte);
+    }
     define_u8_accessors!(tima, 0xFF05);
     define_u8_accessors!(tma, 0xFF06);
     define_flags_accessors!(tac, 0xFF07, TAC);

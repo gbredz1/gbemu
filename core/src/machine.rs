@@ -46,25 +46,29 @@ impl Machine {
     }
 
     pub fn step_frame(&mut self) -> Result<(usize, bool), Box<dyn Error>> {
-        let mut total_cycles = 0;
-        let mut break_flag = false;
+        const CYCLES_PER_FRAME: usize = 70224;
 
-        for _ in 0..70224 {
-            total_cycles += self.step()?;
+        let mut total_cycles: usize = 0;
+        let mut breakpoint_hit = false;
+
+        for _ in 0..CYCLES_PER_FRAME {
+            total_cycles += self.step()? as usize;
 
             if self.breakpoint_manager.has_breakpoint(self.cpu.pc()) {
-                break_flag = true;
+                breakpoint_hit = true;
                 break;
             }
         }
 
-        Ok((total_cycles as usize, break_flag))
+        Ok((total_cycles, breakpoint_hit))
     }
 
     pub fn step(&mut self) -> Result<u8, Box<dyn Error>> {
         let cycles = self.cpu.step(&mut self.bus)?;
-        self.timer.step(&mut self.bus, cycles);
         self.ppu.update(&mut self.bus, cycles as u32);
+        if !self.cpu.stop() {
+            self.timer.step(&mut self.bus, cycles);
+        }
 
         Ok(cycles)
     }

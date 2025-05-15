@@ -13,8 +13,8 @@ mod instruction;
 #[cfg(test)]
 mod decoder_test;
 mod display;
-mod register;
 mod instruction_test;
+mod register;
 
 use crate::{cpu_decode, cpu_decode_cb};
 
@@ -36,6 +36,7 @@ pub struct Cpu {
     sp: u16,
     pc: u16,
     halted: bool,
+    stopped: bool,
     ime: bool,
     ime_scheduled: bool,
 }
@@ -50,6 +51,7 @@ impl Default for Cpu {
             sp: 0xFFFE,
             pc: 0x0100,
             halted: false,
+            stopped: false,
             ime: false,
             ime_scheduled: false,
         }
@@ -132,10 +134,12 @@ impl Cpu {
 
             if !(if_val & ie_val).is_empty() {
                 self.halted = false;
-            }
 
-            if !self.ime {
-                return 0;
+                if !self.ime {
+                    return 0; // no IME, do not handle interrupt
+                }
+            } else {
+                return 0; // no interruptions, stay halted
             }
         } else if !self.ime {
             return 0;
@@ -144,6 +148,7 @@ impl Cpu {
         let if_val = bus.interrupt_flag();
         let ie_val = bus.interrupt_enable();
         let triggered = if_val & ie_val;
+
         if triggered.is_empty() {
             return 0;
         }
@@ -151,10 +156,6 @@ impl Cpu {
         // Disable IME
         self.ime = false;
         self.ime_scheduled = false;
-
-        // Save current PC on the stack
-        self.sp = self.sp.wrapping_sub(2);
-        bus.write_word(self.sp, self.pc);
 
         // Determine which interrupt to handle (priority: VBlank > LCD STAT > Timer > Serial > Joypad)
         let interrupt_vector = if triggered.contains(Interrupt::VBLANK) {
@@ -312,12 +313,18 @@ impl Cpu {
     pub fn set_halted(&mut self, value: bool) {
         self.halted = value;
     }
+    pub fn stop(&self) -> bool {
+        self.stopped
+    }
+    pub fn set_stopped(&mut self, value: bool) {
+        self.stopped = value;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bus::BusIO;
+    use crate::bus::{BusIO, InterruptBus};
     use crate::tests::bus::TestBus;
 
     impl CpuBus for TestBus {}
@@ -395,5 +402,34 @@ mod tests {
         let actual_value = cpu.sp_pop_word(&mut bus);
         assert_eq!(cpu.sp(), 0xCFFF, "Stack pointer should be incremented by 2");
         assert_eq!(actual_value, initial_value, "Stack value should be read");
+    }
+
+    #[test]
+    fn test_interrupt_handling_ime_disabled() {
+        let mut cpu = Cpu::default();
+        let mut bus = TestBus::default();
+
+        // Set up interrupt conditions but keep IME disabled
+        cpu.set_ime(false);
+        cpu.set_halted(true);
+        bus.set_interrupt_enable(Interrupt::VBLANK);
+        bus.set_interrupt_flag(Interrupt::VBLANK);
+
+        // Save initial PC and SP
+        let initial_pc = cpu.pc();
+        let initial_sp = cpu.sp();
+
+        // Step CPU
+        let cycles = cpu.handle_interrupt(&mut bus);
+
+        // CPU should exit HALT but not handle interrupt
+        assert!(!cpu.halt(), "CPU should exit HALT state");
+        assert_eq!(cycles, 0, "No cycles should be consumed when IME is disabled");
+        assert_eq!(cpu.pc(), initial_pc, "PC should not change");
+        assert_eq!(cpu.sp(), initial_sp, "SP should not change");
+        assert!(
+            bus.interrupt_flag().contains(Interrupt::VBLANK),
+            "Interrupt flag should remain set"
+        );
     }
 }
