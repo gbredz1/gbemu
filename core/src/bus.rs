@@ -143,6 +143,17 @@ impl MemorySystem {
             return;
         }
 
+        if address == 0xFF46 {
+            // DMA transfer
+            let src_addr = (byte as u16) << 8;
+            for i in 0..0xA0 {
+                let data = self.read_byte(src_addr + i);
+                self.write_internal_byte(0xFE00 + i, data);
+            }
+
+            return;
+        }
+
         if self.boot_rom_enabled && address < 0x100 {
             error!("Writing to boot rom is not allowed");
         } else {
@@ -164,7 +175,7 @@ impl MemorySystem {
 
     pub fn read_word(&self, address: u16) -> u16 {
         (self.read_byte(address) as u16)  // LSB first
-                | (self.read_byte(address + 1) as u16) << 8 // MSB second
+            | (self.read_byte(address + 1) as u16) << 8 // MSB second
     }
 
     pub fn write_word(&mut self, address: u16, word: u16) {
@@ -231,8 +242,8 @@ mod tests {
             assert_eq!(
                 memory.read_byte(address),
                 value,
-                "{}",
-                format!("Read byte should return the written value {}", description)
+                "Read byte should return the written value {}",
+                description
             );
         }
     }
@@ -250,22 +261,37 @@ mod tests {
             assert_eq!(
                 memory.read_word(address),
                 value,
-                "{}",
-                format!("Read word should return the written value {}", description)
+                "Read word should return the written value {}",
+                description
             );
 
             assert_eq!(
                 memory.read_byte(address),
                 value as u8,
-                "{}",
                 "LSB should be at the given address"
             );
             assert_eq!(
                 memory.read_byte(address + 1),
                 (value >> 8) as u8,
-                "{}",
                 "MSB should be at the given address"
             );
         }
+    }
+
+    #[test]
+    fn test_dma_transfer() {
+        let mut memory = MemorySystem::default();
+        memory.write_byte(0xC000, 80); // y position
+        memory.write_byte(0xC001, 88); // x position
+        memory.write_byte(0xC002, 1); // tile index
+        memory.write_byte(0xC003, 0); // attributes
+
+        // DMA transfer
+        memory.write_byte(0xFF46, 0xC0);
+
+        assert_eq!(memory.read_oam(0), 80);
+        assert_eq!(memory.read_oam(1), 88);
+        assert_eq!(memory.read_oam(2), 1);
+        assert_eq!(memory.read_oam(3), 0);
     }
 }
