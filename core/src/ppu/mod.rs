@@ -2,14 +2,19 @@ use crate::bus::Interrupt;
 use crate::ppu::mode::Mode;
 pub(crate) use crate::ppu::ppu_bus::PpuBus;
 pub(crate) use crate::ppu::ppu_bus::{LcdControl, LcdStatus};
+use crate::ppu::sprite::Sprite;
 
 mod mode;
 mod ppu_bus;
+mod sprite;
+
+const LCD_WIDTH: u8 = 160;
+const LCD_HEIGHT: u8 = 144;
 
 pub(crate) struct Ppu {
     // Internal status
     mode_clock: u64, // Cycle counter for current mode
-    current_line_sprites: Vec<(u8, u8, u8, u8)>,
+    sprites_visibles_on_current_line: Vec<Sprite>,
 
     // buffer
     pub frame_buffer: Vec<u8>,
@@ -19,8 +24,8 @@ impl Default for Ppu {
     fn default() -> Self {
         Self {
             mode_clock: 0,
-            frame_buffer: vec![0; 160 * 144],
-            current_line_sprites: Vec::with_capacity(10),
+            frame_buffer: vec![0; LCD_WIDTH as usize * LCD_HEIGHT as usize],
+            sprites_visibles_on_current_line: Vec::with_capacity(10),
         }
     }
 }
@@ -29,8 +34,7 @@ impl Ppu {
     pub fn reset(&mut self, bus: &mut impl PpuBus) {
         bus.write_mode(Mode::HBlank);
         self.mode_clock = 0;
-        self.frame_buffer.fill(4);
-        self.current_line_sprites.clear();
+        self.frame_buffer.fill(33);
 
         // ly and lyc can update LCDC
         bus.set_ly(0);
@@ -46,6 +50,10 @@ impl Ppu {
         bus.set_obp1(0xFF);
         bus.set_wy(0);
         bus.set_wx(0);
+
+        for addr in 0xFE00..0xFEA0 {
+            bus.write_internal_byte(addr, 0);
+        }
     }
 
     pub fn update(&mut self, bus: &mut impl PpuBus, cycles: u32) {
@@ -75,10 +83,10 @@ impl Ppu {
             bus.update_stat(LcdStatus::LYC_EQUAL, false);
         }
 
-        if new_ly < 144 {
+        if new_ly < LCD_HEIGHT {
             self.render_line(bus, new_ly);
             bus.write_mode(Mode::HBlank);
-        } else if new_ly == 144 {
+        } else if new_ly == LCD_HEIGHT {
             bus.write_mode(Mode::VBlank);
             bus.update_interrupt_flag(Interrupt::VBLANK, true);
         } else {
@@ -91,7 +99,18 @@ impl Ppu {
             return;
         }
 
-        let tiledata_mode_0 = bus.lcdc().contains(LcdControl::TILEDATA_AREA);
+        if bus.lcdc().contains(LcdControl::BG_WINDOW_ENABLE) {
+            self.render_background_line(bus, line);
+        }
+
+        if bus.lcdc().contains(LcdControl::OBJ_ENABLE) {
+            let double_height = bus.lcdc().contains(LcdControl::OBJ_SIZE);
+            self.update_visibles_sprites(bus, line, double_height);
+            self.render_sprites_line(bus, line, double_height);
+        }
+    }
+
+    fn render_background_line(&mut self, bus: &impl PpuBus, line: u8) {
         let tilemap = if bus.lcdc().contains(LcdControl::TILEMAP_AREA) {
             0x1C00 // at $9C00
         } else {
@@ -103,7 +122,7 @@ impl Ppu {
         let scroll_x = bus.scx() as u16;
 
         // Draw background
-        for x in 0..160 {
+        for x in 0..LCD_WIDTH as u16 {
             let bg_y = (y + scroll_y) % 256;
             let bg_x = (x + scroll_x) % 256;
 
@@ -116,7 +135,7 @@ impl Ppu {
             let tile_addr = tilemap + tile_x + tile_y * 32;
             let tile_value = bus.read_vram(tile_addr) as u16;
 
-            let tile_data_addr = if tiledata_mode_0 {
+            let tile_data_addr = if bus.lcdc().contains(LcdControl::TILEDATA_AREA) {
                 tile_value * 16
             } else if tile_value < 128 {
                 0x1000 + tile_value * 16
@@ -137,7 +156,75 @@ impl Ppu {
             let color_id = (color_high << 1) | color_low;
             let color = bus.bgp_color(color_id);
 
-            self.frame_buffer[(y * 160 + x) as usize] = color;
+            self.frame_buffer[(y * LCD_WIDTH as u16 + x) as usize] = color;
+        }
+    }
+
+    fn update_visibles_sprites(&mut self, bus: &impl PpuBus, line: u8, double_height: bool) {
+        self.sprites_visibles_on_current_line.clear();
+
+        // look at all sprites in the OAM (40 sprites max)
+        for sprite_idx in (0..40 * 4).step_by(4) {
+            let bytes = [
+                bus.read_oam(sprite_idx),
+                bus.read_oam(sprite_idx + 1),
+                bus.read_oam(sprite_idx + 2),
+                bus.read_oam(sprite_idx + 3),
+            ];
+            let sprite = Sprite::from(bytes);
+
+            if sprite.is_visible_at_line(line, double_height) {
+                self.sprites_visibles_on_current_line.push(sprite);
+
+                if self.sprites_visibles_on_current_line.len() >= 10 {
+                    break;
+                }
+            }
+        }
+
+        // Sort by X coordinate in descending order
+        self.sprites_visibles_on_current_line
+            .sort_by_key(|s| std::cmp::Reverse(s.x()));
+    }
+
+    fn render_sprites_line(&mut self, bus: &impl PpuBus, line: u8, double_height: bool) {
+        for sprite in &self.sprites_visibles_on_current_line {
+            let tile_addr = sprite.get_tile_address(line, double_height);
+
+            // draw 8 pixels of the sprite
+            for px in 0..8 {
+                let x = sprite.x() as usize + px;
+                if x >= LCD_WIDTH as usize {
+                    // out of screen
+                    continue;
+                }
+
+                //  pixel value
+                let low_byte = bus.read_vram(tile_addr);
+                let high_byte = bus.read_vram(tile_addr + 1);
+                let bit_pos = if sprite.has_x_flip() { px } else { 7 - px };
+
+                // apply palette
+                let color_low = (low_byte >> bit_pos) & 0x01;
+                let color_high = (high_byte >> bit_pos) & 0x01;
+                let color_id = (color_high << 1) | color_low;
+
+                // color_id == 0 means transparent for sprites
+                if color_id == 0 {
+                    continue;
+                }
+
+                // todo handle priority sprite/background => sprite.priority()
+
+                // retrieve the color from the palette
+                let color = if sprite.palette() {
+                    bus.obp1_color(color_id)
+                } else {
+                    bus.obp0_color(color_id)
+                };
+
+                self.frame_buffer[line as usize * LCD_WIDTH as usize + x] = color;
+            }
         }
     }
 
