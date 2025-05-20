@@ -2,7 +2,7 @@ use crate::views::*;
 use crate::widgets::screen::Screen;
 use crate::widgets::{screen, title_panel};
 use gbrust_core::Machine;
-use iced::alignment::Vertical;
+use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
@@ -233,7 +233,7 @@ fn view_control_panel<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
         .on_press(Message::StepFrame)
         .style(button::secondary);
 
-    let total_cycles = text(format!("Cycles: {}", app.total_cycles));
+    let total_cycles = column![text("cycles:").size(12), text(app.total_cycles).size(12),].align_x(Horizontal::Center);
 
     let breakpoint_controls = view_breakpoint_controls(app);
 
@@ -246,7 +246,7 @@ fn view_control_panel<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
         reset_button,
         breakpoint_controls,
         load_rom,
-        total_cycles
+        total_cycles,
     ]
     .spacing(BUTTON_SPACING)
     .align_y(Vertical::Center)

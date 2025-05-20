@@ -171,30 +171,40 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
         horizontal_space(),
         row![
             button(text("SP").size(SIZE).color(pink()))
+                .padding(2)
                 .style(button::text)
                 .on_press(Message::InputChanged(format!("{:03X}", machine.cpu().sp() / 0x10))),
             button(text("PC").size(SIZE).color(purple()))
+                .padding(2)
                 .style(button::text)
                 .on_press(Message::InputChanged(format!("{:03X}", machine.cpu().pc() / 0x10))),
             button(text("HL").size(SIZE).color(yellow()))
+                .padding(2)
                 .style(button::text)
                 .on_press(Message::InputChanged(format!("{:03X}", machine.cpu().hl() / 0x10))),
             Row::from_vec(
                 [
                     MemorySectors::RomBank0,
                     MemorySectors::RomBank1,
-                    MemorySectors::VideoRam
+                    MemorySectors::VideoRam,
+                    MemorySectors::ExternalRam,
+                    MemorySectors::WorkRam0,
+                    MemorySectors::WorkRamN,
+                    MemorySectors::Oam,
+                    MemorySectors::HighRam
                 ]
                 .iter()
                 .map(|sector| {
                     button(text(sector.name()).size(SIZE))
                         .style(button::text)
+                        .padding(2)
                         .on_press(Message::InputChanged(sector.addr().into()))
                         .into()
                 })
                 .collect()
             ),
-        ],
+        ]
+        .wrap(),
         horizontal_space(),
     ]
     .align_y(Vertical::Center);
