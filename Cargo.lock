@@ -1523,7 +1523,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gbrust-core"
+name = "gbemu-core"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
@@ -1532,13 +1532,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "gbrust-desktop"
+name = "gbemu-iced"
 version = "0.1.0"
 dependencies = [
  "clap",
  "dotenv",
  "env_logger",
- "gbrust-core",
+ "gbemu-core",
  "iced",
  "iced_aw",
  "log",
@@ -1546,13 +1546,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "gbrust-term"
+name = "gbemu-term"
 version = "0.1.0"
 dependencies = [
  "crossterm 0.29.0",
  "dotenv",
  "env_logger",
- "gbrust-core",
+ "gbemu-core",
  "ratatui",
 ]
 

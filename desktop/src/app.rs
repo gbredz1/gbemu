@@ -1,7 +1,7 @@
 use crate::views::*;
 use crate::widgets::screen::Screen;
 use crate::widgets::{screen, title_panel};
-use gbrust_core::{JoypadButton, Machine};
+use gbemu_core::{JoypadButton, Machine};
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};

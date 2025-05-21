@@ -1,11 +1,11 @@
 [package]
-name = "gbrust-desktop"
+name = "gbemu-iced"
 version = "0.1.0"
 edition = "2024"
 publish = false
 
 [dependencies]
-gbrust-core = { path = "../core" }
+gbemu-core = { path = "../core" }
 
 env_logger = "0.11"
 dotenv = "0.15"

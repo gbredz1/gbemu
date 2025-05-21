@@ -1,6 +1,6 @@
 use crate::app::Message;
 use crate::theme::color::*;
-use gbrust_core::Machine;
+use gbemu_core::Machine;
 use iced::Element;
 use iced::alignment::Horizontal;
 use iced::widget::{Space, column, row, text};

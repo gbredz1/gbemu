@@ -10,5 +10,5 @@ publish = false
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.dev.package."gbrust-core"]
+[profile.dev.package."gbemu-core"]
 opt-level = 1

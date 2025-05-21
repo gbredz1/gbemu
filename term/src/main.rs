@@ -1,5 +1,5 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use gbrust_core::{CpuFlags, Machine};
+use gbemu_core::{CpuFlags, Machine};
 use ratatui::prelude::*;
 use ratatui::widgets::canvas::{Canvas, Points};
 use ratatui::widgets::{Block, Paragraph, Wrap};

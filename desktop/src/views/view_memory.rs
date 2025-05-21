@@ -1,4 +1,4 @@
-use gbrust_core::Machine;
+use gbemu_core::Machine;
 
 use crate::theme::color::{green, orange, pink, purple, yellow};
 use iced::alignment::{Horizontal, Vertical};
