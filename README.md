@@ -10,6 +10,7 @@ This project serves as a personal learning exercise to learn and gain experience
 ```bash
 cargo run --release --bin gbemu-iced
 ```
+![screenshoot_001.png](https://i.ibb.co/r2Kt5RFC/screenshot-001.png)
 #### Terminal (experiment)
 ```bash
 cargo run --release --bin gbemu-term
