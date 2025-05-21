@@ -1,7 +1,7 @@
 use crate::views::*;
 use crate::widgets::screen::Screen;
 use crate::widgets::{screen, title_panel};
-use gbrust_core::Machine;
+use gbrust_core::{JoypadButton, Machine};
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
@@ -48,6 +48,10 @@ pub enum Message {
     // Visual components
     ScreenView(screen::Message),
     MemoryView(view_memory::Message),
+
+    // Machine inputs
+    ButtonsPressed(JoypadButton),
+    ButtonsReleased(JoypadButton),
 }
 
 impl Default for App {
@@ -81,6 +85,29 @@ impl App {
             keyboard::Key::Named(Named::Space) => Some(Message::TogglePlayback),
             keyboard::Key::Named(Named::Escape) => Some(Message::CloseWindow),
             keyboard::Key::Character("l") => Some(Message::OpenFile),
+
+            keyboard::Key::Named(Named::ArrowUp) => Some(Message::ButtonsPressed(JoypadButton::Up)),
+            keyboard::Key::Named(Named::ArrowDown) => Some(Message::ButtonsPressed(JoypadButton::Down)),
+            keyboard::Key::Named(Named::ArrowLeft) => Some(Message::ButtonsPressed(JoypadButton::Left)),
+            keyboard::Key::Named(Named::ArrowRight) => Some(Message::ButtonsPressed(JoypadButton::Right)),
+            keyboard::Key::Character("d") => Some(Message::ButtonsPressed(JoypadButton::A)),
+            keyboard::Key::Character("f") => Some(Message::ButtonsPressed(JoypadButton::B)),
+            keyboard::Key::Character("c") => Some(Message::ButtonsPressed(JoypadButton::Start)),
+            keyboard::Key::Character("v") => Some(Message::ButtonsPressed(JoypadButton::Select)),
+
+            _ => None,
+        }));
+
+        subscriptions.push(keyboard::on_key_release(|key, _modifiers| match key.as_ref() {
+            keyboard::Key::Named(Named::ArrowUp) => Some(Message::ButtonsReleased(JoypadButton::Up)),
+            keyboard::Key::Named(Named::ArrowDown) => Some(Message::ButtonsReleased(JoypadButton::Down)),
+            keyboard::Key::Named(Named::ArrowLeft) => Some(Message::ButtonsReleased(JoypadButton::Left)),
+            keyboard::Key::Named(Named::ArrowRight) => Some(Message::ButtonsReleased(JoypadButton::Right)),
+            keyboard::Key::Character("d") => Some(Message::ButtonsReleased(JoypadButton::A)),
+            keyboard::Key::Character("f") => Some(Message::ButtonsReleased(JoypadButton::B)),
+            keyboard::Key::Character("c") => Some(Message::ButtonsReleased(JoypadButton::Start)),
+            keyboard::Key::Character("v") => Some(Message::ButtonsReleased(JoypadButton::Select)),
+
             _ => None,
         }));
 
@@ -107,6 +134,16 @@ impl App {
             // Visual components
             Message::ScreenView(msg) => self.screen.update(msg).map(Message::ScreenView),
             Message::MemoryView(msg) => self.view_memory_state.update(msg).map(Message::MemoryView),
+
+            // Machine inputs
+            Message::ButtonsPressed(button) => {
+                self.machine.button_pressed(button);
+                Task::none()
+            }
+            Message::ButtonsReleased(button) => {
+                self.machine.button_released(button);
+                Task::none()
+            }
         }
     }
     pub fn view(&self) -> Element<Message> {

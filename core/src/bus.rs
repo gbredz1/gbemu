@@ -79,6 +79,7 @@ macro_rules! define_palette_accessors {
         }
     };
 }
+use crate::joypad::joypad_bus::JoypadBus;
 use crate::timer::timer_bus::TimerBus;
 pub(crate) use define_palette_accessors;
 
@@ -222,6 +223,7 @@ impl CpuBus for MemorySystem {}
 impl PpuBus for MemorySystem {}
 impl TimerBus for MemorySystem {}
 impl InterruptBus for MemorySystem {}
+impl JoypadBus for MemorySystem {}
 
 #[cfg(test)]
 mod tests {

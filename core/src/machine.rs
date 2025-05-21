@@ -1,6 +1,8 @@
 use crate::bus::{InterruptBus, MemorySystem};
 use crate::cpu::Cpu;
 use crate::debug::breakpoint::BreakpointManager;
+use crate::joypad;
+use crate::joypad::Joypad;
 use crate::ppu::Ppu;
 use crate::timer::Timer;
 use log::info;
@@ -13,6 +15,7 @@ pub struct Machine {
     bus: MemorySystem,
     ppu: Ppu,
     timer: Timer,
+    joypad: Joypad,
     start_addr: Option<u16>,
     breakpoint_manager: BreakpointManager,
 }
@@ -69,6 +72,7 @@ impl Machine {
         if !self.cpu.stop() {
             self.timer.step(&mut self.bus, cycles);
         }
+        self.joypad.update(&mut self.bus);
 
         Ok(cycles)
     }
@@ -82,8 +86,17 @@ impl Machine {
         }
         self.timer.reset(&mut self.bus);
         self.ppu.reset(&mut self.bus);
+        self.joypad.reset(&mut self.bus);
 
         self.bus.set_interrupt_enable_u8(0x00);
         self.bus.set_interrupt_flag_u8(0xE1);
+    }
+
+    pub fn button_pressed(&mut self, button: joypad::Button) {
+        self.joypad.button_pressed(button);
+    }
+
+    pub fn button_released(&mut self, button: joypad::Button) {
+        self.joypad.button_released(button);
     }
 }
