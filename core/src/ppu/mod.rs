@@ -71,7 +71,7 @@ impl Ppu {
         self.mode_clock -= CYCLES_PER_LINE;
 
         let current_ly = bus.ly();
-        let new_ly = (current_ly + 1) % 154;
+        let new_ly = current_ly.wrapping_add(1) % 154;
         bus.set_ly(new_ly);
 
         if new_ly == bus.lyc() {

@@ -99,4 +99,12 @@ impl Machine {
     pub fn button_released(&mut self, button: joypad::Button) {
         self.joypad.button_released(button);
     }
+
+    pub fn button_changed(&mut self, button: joypad::Button, pressed: bool) {
+        if pressed {
+            self.button_pressed(button);
+        } else {
+            self.button_released(button);
+        }
+    }
 }

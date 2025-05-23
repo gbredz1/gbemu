@@ -1,50 +1,70 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use gbemu_core::{CpuFlags, Machine};
-use ratatui::prelude::*;
-use ratatui::widgets::canvas::{Canvas, Points};
-use ratatui::widgets::{Block, Paragraph, Wrap};
+mod screen_view;
+
+use crate::screen_view::{SCREEN_HEIGHT, SCREEN_WIDTH, ScreenView};
+use clap::Parser;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
+use crossterm::terminal::supports_keyboard_enhancement;
+use crossterm::{event, execute};
+use gbemu_core::{JoypadButton, Machine};
+use log::{debug, error};
 use ratatui::DefaultTerminal;
+use ratatui::prelude::*;
+use ratatui::symbols::Marker;
+use ratatui::widgets::canvas::Canvas;
 use std::io;
-use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+#[derive(Debug)]
+struct Args {
+    rom_path: Option<String>,
+    #[arg(short = 'b', long, default_value = "false")]
+    use_boot_rom: bool,
+}
+
 fn main() -> io::Result<()> {
     dotenv::dotenv().ok();
-    let logs = Arc::new(Mutex::new(Vec::new()));
-    let target = AppLogger {
-        logs: Arc::clone(&logs),
-    };
-    env_logger::builder()
-        .target(env_logger::Target::Pipe(Box::new(target)))
-        .init();
+    env_logger::builder().format_timestamp_nanos().init();
 
+    if !supports_keyboard_enhancement()? {
+        error!("Keyboard enhancement isn't supported");
+    }
+
+    let args = Args::parse();
+    debug!("{:?}", args);
+
+    let mut result = Ok(());
     let mut app = App::default();
-    app.step_by_step = false;
-    app.set_logs(logs);
-    app.load("roms/dmg.bin")?;
+    if args.use_boot_rom {
+        result = app.machine.use_boot_rom();
+    }
+    if let Some(rom_path) = &args.rom_path {
+        result = app.load(rom_path.as_str());
+    }
 
-    let mut terminal = ratatui::init();
-    let app_result = app.run(&mut terminal);
+    if result.is_ok() {
+        let mut terminal = ratatui::init();
+
+        let mut stdout = io::stdout();
+        execute!(stdout, PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::all()))?;
+
+        result = app.run(&mut terminal);
+    }
+
     ratatui::restore();
 
-    app_result
+    result
 }
 
 #[derive(Default)]
 struct App {
     machine: Machine,
     exit: bool,
-    logs: Option<Arc<Mutex<Vec<String>>>>,
-    fps: f64,
-    step_by_step: bool,
 }
 
 impl App {
-    pub fn set_logs(&mut self, logs: Arc<Mutex<Vec<String>>>) {
-        self.logs = Some(logs);
-    }
-
     pub fn load(&mut self, path: &str) -> io::Result<()> {
         self.machine.load_cartridge(path)?;
         self.machine.reset();
@@ -54,142 +74,44 @@ impl App {
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         let mut delta = Duration::from_nanos(0);
-        let target_frame_time = Duration::from_secs_f64(1.0 / 60.0);
+        let target_frame_time = Duration::from_secs_f64(1.0 / 30.0);
 
         while !self.exit {
             let frame_start = Instant::now();
 
             self.handle_events()?;
-            self.update(&delta)?;
+            self.update(&delta);
             terminal.draw(|frame| self.draw(frame))?;
 
             delta = frame_start.elapsed();
 
-            // sleep for loop a 60fps
             if delta < target_frame_time {
                 sleep(target_frame_time - delta);
             }
-
-            self.fps = 1.0 / frame_start.elapsed().as_secs_f64();
         }
         Ok(())
     }
 
-    fn update(&mut self, _delta: &Duration) -> io::Result<()> {
-        if self.step_by_step {
-            self.machine.step().expect("Error while stepping machine");
-        } else {
-            self.machine.step_frame().expect("Error while updating the machine");
-        }
-
-        Ok(())
+    fn update(&mut self, _delta: &Duration) {
+        self.machine.step_frame().unwrap_or_else(|e| {
+            error!("{}", e);
+            (0, false)
+        });
     }
 
     fn draw(&self, frame: &mut Frame) {
-        const GB_WIDTH: usize = 160;
-        const GB_HEIGHT: usize = 144;
-
-        let vertical = Layout::vertical([
-            Constraint::Percentage(80), // screen § debug
-            Constraint::Percentage(20), // logs
-        ]);
-        let [content_area, logs_area] = vertical.areas(frame.area());
-        let [screen_area, debug_area] = Layout::horizontal([
-            Constraint::Percentage(50), // screen
-            Constraint::Percentage(50), // debug infos
-        ])
-        .areas(content_area);
-
-        // Screen
         let screen_block = Canvas::default()
-            .block(Block::default().title("Screen"))
+            .x_bounds([0., SCREEN_WIDTH as f64])
+            .y_bounds([0., SCREEN_HEIGHT as f64])
+            .marker(Marker::HalfBlock)
             .paint(|ctx| {
-                let frame_buffer = self.machine.frame();
-                let mut color_0 = vec![];
-                let mut color_1 = vec![];
-                let mut color_2 = vec![];
-                let mut color_3 = vec![];
-
-                for y in 0..GB_WIDTH {
-                    for x in 0..GB_HEIGHT {
-                        let idx = y * GB_HEIGHT + x;
-
-                        let bytes = frame_buffer[idx];
-                        match bytes {
-                            1 => color_1.push((x as f64, y as f64)),
-                            2 => color_2.push((x as f64, y as f64)),
-                            3 => color_3.push((x as f64, y as f64)),
-                            _ => color_0.push((x as f64, y as f64)),
-                        }
-                    }
-                }
-
-                ctx.draw(&Points {
-                    coords: &color_0,
-                    color: Color::Rgb(155, 188, 15),
-                });
-                ctx.draw(&Points {
-                    coords: &color_1,
-                    color: Color::Rgb(139, 172, 15),
-                });
-                ctx.draw(&Points {
-                    coords: &color_2,
-                    color: Color::Rgb(48, 98, 48),
-                });
-                ctx.draw(&Points {
-                    coords: &color_3,
-                    color: Color::Rgb(15, 56, 15),
-                });
-            })
-            .x_bounds([0.0, GB_WIDTH as f64])
-            .y_bounds([0.0, GB_HEIGHT as f64]);
-        frame.render_widget(screen_block, screen_area);
-
-        // Debug infos
-        let debug_info = format!(
-            "FPS: {:.1}\n\n\
-            AF: {:04X}  Flags: [{}{}{}{}]\n\
-            BC: {:04X}  LCDC:  {:02X}\n\
-            DE: {:04X}  STAT:  {:02X}\n\
-            HL: {:04X}  LY:  {:02X}\n\
-            SP: {:04X}\n\
-            PC: {:04X}\n\n",
-            self.fps,
-            self.machine.cpu().af(),
-            if self.machine.cpu().flag(CpuFlags::Z) { "Z" } else { "_" },
-            if self.machine.cpu().flag(CpuFlags::N) { "N" } else { "_" },
-            if self.machine.cpu().flag(CpuFlags::H) { "H" } else { "_" },
-            if self.machine.cpu().flag(CpuFlags::C) { "C" } else { "_" },
-            self.machine.cpu().bc(),
-            self.machine.bus().read_byte(0xFF40), // LCDC
-            self.machine.cpu().de(),
-            self.machine.bus().read_byte(0xFF41), // STAT
-            self.machine.cpu().hl(),
-            self.machine.bus().read_byte(0xFF44), // LY
-            self.machine.cpu().sp(),
-            self.machine.cpu().pc(),
-        );
-
-        let debug_widget = Paragraph::new(debug_info).block(Block::bordered().title("Debug"));
-
-        frame.render_widget(debug_widget, debug_area);
-
-        // Logs
-        if let Some(logs) = &self.logs {
-            let mut logs_vec = logs.lock().unwrap();
-            let logs_text = logs_vec.join("");
-            logs_vec.clear();
-
-            let logs_widget = Paragraph::new(logs_text)
-                .block(Block::bordered().title("Logs"))
-                .wrap(Wrap { trim: true });
-
-            frame.render_widget(logs_widget, logs_area);
-        }
+                ctx.draw(&ScreenView::from(self.machine.frame()));
+            });
+        frame.render_widget(screen_block, frame.area());
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        if !self.step_by_step && !event::poll(Duration::from_nanos(0))? {
+        if !event::poll(Duration::from_nanos(0))? {
             return Ok(());
         }
 
@@ -201,33 +123,22 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Esc => self.exit(),
-            KeyCode::Char('*') => self.machine.reset(),
+        match (key_event.code, !key_event.is_release()) {
+            (KeyCode::Esc, _) => self.exit(),
+            (KeyCode::Char('*'), _) => self.machine.reset(),
+            (KeyCode::Up, pressed) => self.machine.button_changed(JoypadButton::Up, pressed),
+            (KeyCode::Down, pressed) => self.machine.button_changed(JoypadButton::Down, pressed),
+            (KeyCode::Left, pressed) => self.machine.button_changed(JoypadButton::Left, pressed),
+            (KeyCode::Right, pressed) => self.machine.button_changed(JoypadButton::Right, pressed),
+            (KeyCode::Char('d'), pressed) => self.machine.button_changed(JoypadButton::A, pressed),
+            (KeyCode::Char('f'), pressed) => self.machine.button_changed(JoypadButton::B, pressed),
+            (KeyCode::Char('c'), pressed) => self.machine.button_changed(JoypadButton::Select, pressed),
+            (KeyCode::Char('v'), pressed) => self.machine.button_changed(JoypadButton::Start, pressed),
             _ => {}
         }
     }
 
     fn exit(&mut self) {
         self.exit = true;
-    }
-}
-
-pub struct AppLogger {
-    logs: Arc<Mutex<Vec<String>>>,
-}
-
-impl io::Write for AppLogger {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Ok(log_str) = String::from_utf8(buf.to_vec()) {
-            if let Ok(mut logs) = self.logs.lock() {
-                logs.push(log_str);
-            }
-        }
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
