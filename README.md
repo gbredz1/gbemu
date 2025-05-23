@@ -7,11 +7,17 @@ This project serves as a personal learning exercise to learn and gain experience
 
 ### Build and Run
 #### Iced Frontend
+
 ```bash
 cargo run --release --bin gbemu-iced
 ```
-![screenshoot_001.png](https://i.ibb.co/r2Kt5RFC/screenshot-001.png)
+
+![desktop iced screenshot](https://i.ibb.co/r2Kt5RFC/screenshot-001.png)
+
 #### Terminal (experiment)
+
 ```bash
-cargo run --release --bin gbemu-term
+cargo run --release --bin gbemu-term -- roms/test.gb
 ```
+
+![terminal screenshot](https://i.ibb.co/bR1SBNjz/screenshot-002.png)
