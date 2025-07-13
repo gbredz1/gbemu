@@ -1,0 +1,45 @@
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      version_tag:
+        required: true
+        type: string
+      is_prerelease:
+        required: false
+        type: boolean
+        default: false
+      release_name:
+        required: false
+        type: string
+        default: ""
+      workflow_run_id:
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: "Artifact download"
+        uses: dawidd6/action-download-artifact@v11
+        with:
+          run_id: ${{ inputs.workflow_run_id != '' && inputs.workflow_run_id || github.run_id }}
+          workflow: build.yml
+          workflow_conclusion: success
+          name: '^tarball-(.*)'
+          name_is_regexp: true
+          path: tarball
+      - name: Publish the release on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ inputs.release_name }}
+          tag_name: ${{ inputs.version_tag }}
+          prerelease: ${{ inputs.is_prerelease }}
+          files: |
+            tarball/tarball-*/*

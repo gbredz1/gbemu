@@ -1,0 +1,94 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      version_tag:
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build ${{ matrix.job.name }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - name: linux-x86_64-gnu
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: windows-x86_64-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+          - name: macOS-aarch64
+            os: macOS-latest
+            target: aarch64-apple-darwin
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Cache cargo & target directories
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.job.target }}
+          shared-key: ${{ matrix.job.target }}
+          cache-on-failure: true
+        if: runner.os == 'Linux'
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: mold clang pkg-config
+            libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0
+            libwayland-dev libxkbcommon-dev
+          version: 1.0
+      - name: Rustup add target
+        run: |
+          rustup target add ${{ matrix.job.target }}
+      - name: Build project
+        run: |
+          cargo build --locked --release --all-targets --target ${{ matrix.job.target }}
+      - name: Create tarball
+        id: tarball
+        shell: bash
+        run: |
+          # add .exe for windows
+          BIN_SUFFIX=$([[ "${{ matrix.job.target }}" = *"-pc-windows-"* ]] && echo ".exe" || echo "")
+
+          # binary path
+          ICED_BIN_NAME="gbemu-iced${BIN_SUFFIX}"
+          ICED_BIN_PATH="target/${{ matrix.job.target }}/release/${ICED_BIN_NAME}"
+          TERM_BIN_NAME="gbemu-term${BIN_SUFFIX}"
+          TERM_BIN_PATH="target/${{ matrix.job.target }}/release/${TERM_BIN_NAME}"
+          # package path
+          PKG_SUFFIX=$([[ "${{ matrix.job.target }}" = *"-linux-"* ]] && echo ".tar.gz" || echo ".zip")
+          PKG_BASENAME=gbemu-${{ inputs.version_tag }}-${{ matrix.job.name }}
+          PKG_NAME=${PKG_BASENAME}${PKG_SUFFIX}
+
+          # put release files in the package directory 
+          mkdir -p "${PKG_BASENAME}"
+          cp "${ICED_BIN_PATH}" "${PKG_BASENAME}/."
+          cp "${TERM_BIN_PATH}" "${PKG_BASENAME}/."          
+
+          # create tarball
+          if [ "${PKG_SUFFIX}" = ".zip" ]; then
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              7z a "${PKG_NAME}" "${PKG_BASENAME}"
+            else
+              zip -r "${PKG_NAME}" "${PKG_BASENAME}"
+            fi
+          else
+            tar -czf "${PKG_NAME}" "${PKG_BASENAME}"
+          fi
+
+          echo "PKG_NAME=${PKG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: "Upload tarball artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ steps.tarball.outputs.PKG_NAME }}
+          path: ${{ steps.tarball.outputs.PKG_NAME }}
+          retention-days: 1

@@ -1,9 +1,9 @@
 use crate::app::Message;
 use crate::theme::color::{blue, green, orange};
 use gbemu_core::{Cpu, CpuFlags};
-use iced::alignment::Horizontal;
-use iced::widget::{row, text, Space};
 use iced::Element;
+use iced::alignment::Horizontal;
+use iced::widget::{Space, row, text};
 
 pub fn view<'a>(cpu: &Cpu) -> Element<'a, Message> {
     const SIZE: u16 = 12;

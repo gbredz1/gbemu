@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*.*.*" ] # tag for release
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  metadata:
+    name: Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version}}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract crate information
+        id: metadata
+        run: |
+          cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name == "gbemu-core") | "version=" + .version' | tee -a $GITHUB_OUTPUT  
+      - name: Error if metadata.version not equal tag
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "${{ steps.metadata.outputs.version  }}" ]; then
+            echo "tag: '${{ github.ref }}' is not equal to metadata version: 'refs/tags/${{ steps.metadata.outputs.version }}'"
+            exit 1
+          fi
+
+  # Call the common build workflow
+  build:
+    name: Call build workflow
+    needs: metadata
+    if: ${{ github.event_name != 'pull_request' && github.ref_type == 'tag' }}
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: write
+    with:
+      version_tag: ${{ needs.metadata.outputs.version }}
+
+  # Create a GitHub release
+  publish:
+    needs: [metadata, build]
+    uses: ./.github/workflows/publish.yml
+    permissions:
+      contents: write
+    with:
+      version_tag: ${{ needs.metadata.outputs.version }}
+      is_prerelease: false
+      release_name: "Release ${{ needs.metadata.outputs.version }}"
+      workflow_run_id: ${{ github.run_id }}

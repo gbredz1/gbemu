@@ -1,0 +1,132 @@
+name: Nightly
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    name: Prepare Nightly
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate nightly version
+        id: nightly
+        run: |
+          echo "nightly_version=nightly-$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+          echo "release_name=Nightly Build $(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+    outputs:
+      nightly_version: ${{ steps.nightly.outputs.nightly_version }}
+      release_name: ${{ steps.nightly.outputs.release_name }}
+
+  # Check if there are changes since last nightly
+  check_changes:
+    name: Check for changes
+    runs-on: ubuntu-latest
+    needs: prepare
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes since last nightly
+        id: check
+        run: |
+          # Get the last nightly tag if it exists
+          LAST_NIGHTLY=$(git tag -l "nightly-*" | sort -r | head -n 1)
+          
+          if [ -z "$LAST_NIGHTLY" ]; then
+            # No previous nightly, so there are changes
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "No previous nightly found, proceeding with build"
+          else
+            # Check if there are any commits between last nightly and now
+            COMMIT_COUNT=$(git rev-list --count $LAST_NIGHTLY..HEAD)
+          
+            if [ "$COMMIT_COUNT" -gt 0 ]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "Found $COMMIT_COUNT commits since last nightly, proceeding with build"
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "No new commits since last nightly, skipping build"
+            fi
+          fi
+
+  # Delete previous nightly release if it exists
+  cleanup_previous:
+    name: Clean previous nightly
+    runs-on: ubuntu-latest
+    needs: [prepare, check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Delete previous nightly tag and release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const releases = await github.rest.repos.listReleases({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+            
+              // Find releases with "nightly" in the name
+              const nightlyReleases = releases.data.filter(release => 
+                release.tag_name.startsWith('nightly-')
+              );
+            
+              // Delete each nightly release found
+              for (const release of nightlyReleases) {
+                console.log(`Deleting previous nightly release: ${release.name} (${release.tag_name})`);
+            
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id
+                });
+            
+                // Also delete the tag
+                try {
+                  await github.rest.git.deleteRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${release.tag_name}`
+                  });
+                  console.log(`Deleted tag: ${release.tag_name}`);
+                } catch (e) {
+                  console.log(`Could not delete tag ${release.tag_name}: ${e.message}`);
+                }
+              }
+            } catch (error) {
+              console.log('Error during cleanup:', error);
+            }
+
+  # Call the common build workflow
+  build:
+    name: Call build workflow
+    needs: [prepare, check_changes, cleanup_previous]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      version_tag: ${{ needs.prepare.outputs.nightly_version }}
+
+  # Publish the nightly build
+  publish:
+    needs: [prepare, build]
+    uses: ./.github/workflows/publish.yml
+    permissions:
+      contents: write
+    with:
+      version_tag: ${{ needs.prepare.outputs.nightly_version }}
+      is_prerelease: true
+      release_name: ${{ needs.prepare.outputs.release_name }}
+      workflow_run_id: ${{ github.run_id }}
