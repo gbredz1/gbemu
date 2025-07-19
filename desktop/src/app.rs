@@ -6,7 +6,7 @@ use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Element, Subscription, Task, keyboard, time, window};
+use iced::{keyboard, time, window, Element, Subscription, Task};
 use log::error;
 use std::time::{Duration, Instant};
 
@@ -228,12 +228,9 @@ impl App {
         Task::none()
     }
     fn open_file(&mut self) -> Task<Message> {
-        let dialog = native_dialog::DialogBuilder::file()
-            .set_title("Open file")
-            .add_filter("ROM", ["gb"])
-            .open_single_file();
+        let dialog = rfd::FileDialog::new().set_title("Open file").add_filter("ROM", &["gb"]);
 
-        if let Ok(Some(path)) = dialog.show() {
+        if let Some(path) = dialog.pick_file() {
             self.machine.reset();
             self.machine.load_cartridge(path).expect("Failed to load rom");
             self.is_running = true;
