@@ -4,6 +4,8 @@ use crate::bus::Interrupt;
 use crate::timer::timer_bus::TAC;
 use timer_bus::TimerBus;
 
+pub(crate) const DMG_DIV_INITIAL_VALUE: u8 = 0xD3;
+
 #[derive(Default)]
 pub struct Timer {
     div_cycles: u16,
@@ -12,7 +14,7 @@ pub struct Timer {
 
 impl Timer {
     pub fn reset(&mut self, bus: &mut impl TimerBus) {
-        bus.set_div(0x00);
+        bus.set_div(DMG_DIV_INITIAL_VALUE);
         bus.set_tima(0x00);
         bus.set_tma(0x00);
         bus.set_tac_u8(0xF8);
@@ -50,7 +52,7 @@ impl Timer {
             let tima = bus.tima();
             if tima == 0xFF {
                 // Overflow
-                bus.set_tima(bus.tma()); // Set TIMA to TMA
+                bus.set_tima(bus.tma()); // put TMA into TIMA
                 bus.set_interrupt_flag(Interrupt::TIMER); // Trigger TIMER interrupt
             } else {
                 // Increment TIMA
@@ -113,5 +115,25 @@ mod tests {
         timer.step(&mut bus, 1);
         assert_eq!(bus.tima(), 0x42);
         assert!(bus.interrupt_flag().contains(Interrupt::TIMER));
+    }
+
+    #[test]
+    fn test_timer_disabled() {
+        let mut timer = Timer::default();
+        let mut bus = TestBus::default();
+
+        // Make sure the timer is disabled.
+        bus.set_tac(TAC::empty());
+        bus.set_tima(0x42);
+
+        // Run enough cycles that TIMA should have incremented if enabled
+        timer.step(&mut bus, 255);
+        timer.step(&mut bus, 1);
+
+        // Check that TIMA has not changed.
+        assert_eq!(bus.tima(), 0x42);
+
+        // Check that DIV continues to increment even if the timer is disabled.
+        assert_eq!(bus.div(), 1);
     }
 }

@@ -193,7 +193,7 @@ impl Ppu {
 
             // draw 8 pixels of the sprite
             for px in 0..8 {
-                let x = sprite.x() as usize + px;
+                let x = (sprite.x() as usize).wrapping_add(px);
                 if x >= LCD_WIDTH as usize {
                     // out of screen
                     continue;

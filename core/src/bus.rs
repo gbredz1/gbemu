@@ -228,6 +228,7 @@ impl JoypadBus for MemorySystem {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::timer::{Timer, DMG_DIV_INITIAL_VALUE};
 
     #[test]
     fn test_read_write_byte() {
@@ -295,5 +296,30 @@ mod tests {
         assert_eq!(memory.read_oam(1), 88);
         assert_eq!(memory.read_oam(2), 1);
         assert_eq!(memory.read_oam(3), 0);
+    }
+
+    #[test]
+    fn test_time_div_reset() {
+        let mut timer = Timer::default();
+        let mut bus = MemorySystem::default();
+        timer.reset(&mut bus);
+
+        // Accumulate a few cycles for DIV
+        assert_eq!(bus.div(), DMG_DIV_INITIAL_VALUE);
+        timer.step(&mut bus, 255);
+        timer.step(&mut bus, 1);
+        assert_eq!(bus.div(), DMG_DIV_INITIAL_VALUE + 1);
+
+        // Simulate writing to a DIV element
+        bus.write_byte(0xFF04, 0x12);
+
+        // Check that DIV is reset to 0
+        assert_eq!(bus.div(), 0);
+
+        // Check that the internal counter is reset, ensuring that 256 complete cycles are required to increment DIV.
+        timer.step(&mut bus, 255);
+        assert_eq!(bus.div(), 0);
+        timer.step(&mut bus, 1);
+        assert_eq!(bus.div(), 1);
     }
 }

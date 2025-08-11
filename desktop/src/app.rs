@@ -6,7 +6,7 @@ use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{keyboard, time, window, Element, Subscription, Task};
+use iced::{Element, Subscription, Task, keyboard, time, window};
 use log::error;
 use std::time::{Duration, Instant};
 
