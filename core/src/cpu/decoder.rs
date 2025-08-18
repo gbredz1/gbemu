@@ -104,7 +104,7 @@ impl LR35902Decoder {
             table[m.opcode as usize] = match (m.x, m.y, m.z, m.p, m.q) {
                 (0, 0, 0, _, _) => instr!(NOP, 1, 4),                                      // NOP
                 (0, 1, 0, _, _) => instr!(LD(z!("(nn)"), z!("SP")), 3, 20),                // LD (nn),SP
-                (0, 2, 0, _, _) => instr!(STOP, 2, 4),                                     // STOP
+                (0, 2, 0, _, _) => instr!(STOP, 1, 4),                                     // STOP
                 (0, 3, 0, _, _) => instr!(JR(z!("e")), 2, 12),                             // JR e
                 (0, 4..=7, 0, _, _) => instr!(JRcc(z_cc!(m.y - 4), z!("e")), 2, 12, 8),    // JR cc[y-4],e
                 (0, _, 1, p, 0) => instr!(LD(z_rp!(p), z!("nn")), 3, 12),                  // LD rp[p],nn
