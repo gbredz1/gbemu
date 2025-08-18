@@ -74,6 +74,10 @@ impl Cpu {
             self.ime_scheduled = false;
         }
 
+        self.fetch_instruction(bus)
+    }
+
+    pub fn fetch_instruction(&mut self, bus: &mut impl CpuBus) -> Result<u8, String> {
         let opcode = self.pc_read_byte(bus);
 
         let instruction = cpu_decode!(opcode);

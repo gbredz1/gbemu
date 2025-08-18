@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["term", "core", "desktop"]
+members = ["term", "core", "desktop", "doctor"]
+default-members = [
+    "desktop",
+    "term",
+]
 
 [workspace.package]
 publish = false

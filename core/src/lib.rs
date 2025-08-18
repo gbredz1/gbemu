@@ -7,7 +7,9 @@ pub(crate) mod ppu;
 mod tests;
 mod timer;
 
+pub use bus::{Interrupt, InterruptBus, MemorySystem};
 pub use cpu::Cpu;
 pub use cpu::Flags as CpuFlags;
 pub use joypad::Button as JoypadButton;
 pub use machine::Machine;
+pub use timer::Timer;

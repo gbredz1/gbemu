@@ -13,7 +13,7 @@ bitflags! {
 }
 
 #[allow(dead_code)]
-pub(crate) trait TimerBus: InterruptBus {
+pub trait TimerBus: InterruptBus {
     fn div(&self) -> u8 {
         self.read_byte(0xFF04)
     }

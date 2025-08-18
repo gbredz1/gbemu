@@ -91,7 +91,7 @@ pub struct MemorySystem {
 }
 
 impl MemorySystem {
-    pub(crate) fn reset(&mut self) {
+    pub fn reset(&mut self) {
         // Clear VRAM
         self.memory[0x8000..=0x9fff].fill(0);
         self.boot_rom_enabled = self.boot_rom_loaded;

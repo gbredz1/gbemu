@@ -1,0 +1,8 @@
+/target
+/logs
+/tools
+/roms
+.run/
+.idea/
+.vscode/
+.env
