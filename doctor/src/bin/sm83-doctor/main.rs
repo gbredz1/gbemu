@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use gbemu_core::{Cpu, InterruptBus, MemorySystem};
+use gbemu_core::{BusIO, Cpu, InterruptBus, TestBus};
 use log::{debug, error, info};
 use serde::Deserialize;
 use std::error::Error;
@@ -28,20 +28,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut errors: Vec<String> = Vec::new();
 
     let mut cpu = Cpu::default();
-    let mut bus = MemorySystem::default();
+    let mut bus = TestBus::default();
+
     for test in tests {
         cpu.reset();
-        bus.reset();
         bus.set_interrupt_flag_u8(0x00);
         bus.set_interrupt_flag_u8(0x00);
 
         cpu.load_state(&test.initial);
         bus.load_state(&test.initial);
 
-        let mut t_cycles = 0u8;
-        t_cycles += cpu.step(&mut bus)?;
-        debug!(" @t_cycles: {}", t_cycles);
-
+        cpu.fetch_instruction(&mut bus)?;
         for (pc, sp, msg) in test.cycles.iter() {
             debug!("  @cycle: {:04X} {:04X} {}", pc, sp, msg);
         }
@@ -111,7 +108,7 @@ impl JsonState for Cpu {
     }
 }
 
-impl JsonState for MemorySystem {
+impl JsonState for TestBus {
     fn load_state(&mut self, state: &State) {
         for ram in state.ram.iter() {
             self.write_internal_byte(ram.addr, ram.val);

@@ -3,7 +3,7 @@ mod cpu_bus;
 
 use crate::bus::Interrupt;
 use crate::cpu::addressing_mode::CC;
-pub(crate) use crate::cpu::cpu_bus::CpuBus;
+pub use crate::cpu::cpu_bus::CpuBus;
 use crate::cpu::register::Register16;
 use bitflags::bitflags;
 
@@ -311,6 +311,9 @@ impl Cpu {
     pub fn set_ime(&mut self, value: bool) {
         self.ime = value;
     }
+    pub fn set_ime_scheduled(&mut self, value: bool) {
+        self.ime_scheduled = value;
+    }
     pub fn halt(&self) -> bool {
         self.halted
     }
@@ -330,8 +333,6 @@ mod tests {
     use super::*;
     use crate::bus::{BusIO, InterruptBus};
     use crate::tests::bus::TestBus;
-
-    impl CpuBus for TestBus {}
 
     #[test]
     fn test_flags() {

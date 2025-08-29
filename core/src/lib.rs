@@ -7,9 +7,11 @@ pub(crate) mod ppu;
 mod tests;
 mod timer;
 
-pub use bus::{Interrupt, InterruptBus, MemorySystem};
-pub use cpu::Cpu;
-pub use cpu::Flags as CpuFlags;
+pub use bus::*;
+pub use cpu::{Cpu, CpuBus, Flags as CpuFlags};
 pub use joypad::Button as JoypadButton;
 pub use machine::Machine;
 pub use timer::Timer;
+
+#[cfg(any(test, feature = "test-bus"))]
+pub use crate::tests::bus::TestBus;

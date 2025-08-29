@@ -1,18 +1,15 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-bus"))]
 pub(crate) mod bus {
     use crate::bus::{BusIO, InterruptBus};
+    use crate::CpuBus;
 
-    pub(crate) struct TestBus {
+    pub struct TestBus {
         pub memory: [u8; 0x10000],
-        pub _interrupts: u8,
     }
 
     impl Default for TestBus {
         fn default() -> Self {
-            Self {
-                memory: [0; 0x10000],
-                _interrupts: 0,
-            }
+            Self { memory: [0; 0x10000] }
         }
     }
 
@@ -41,6 +38,8 @@ pub(crate) mod bus {
             self.memory[address as usize + 1] = (word >> 8) as u8;
         }
     }
+
+    impl CpuBus for TestBus {}
 
     #[test]
     fn test_bus() {
