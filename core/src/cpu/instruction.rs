@@ -1,5 +1,5 @@
 use crate::cpu::addressing_mode::Reg;
-use crate::cpu::addressing_mode::{CC, Op};
+use crate::cpu::addressing_mode::{Op, CC};
 use crate::cpu::instruction::Operation::*;
 use crate::cpu::{Cpu, CpuBus, Flags};
 use crate::z;
@@ -601,7 +601,9 @@ impl Instruction {
                 self.cycles
             }
             EI => {
-                cpu.set_ime(true);
+                if !cpu.ime && !cpu.ime_scheduled {
+                    cpu.set_ime_scheduled(true);
+                }
                 self.cycles
             }
             HALT => {
