@@ -6,6 +6,7 @@ ROMS=${CURRENT_DIR}/roms
 GAMEBOY_DOCTOR_DIR="${TOOLS}/gameboy-doctor"
 GAMEBOY_DOCTOR="${GAMEBOY_DOCTOR_DIR}/gameboy-doctor"
 BLARGG_ROM="${ROMS}/blargg"
+DEMOS="${ROMS}/demos"
 
 GAMEBOY_SM83_DIR="${TOOLS}/sm83"
 
