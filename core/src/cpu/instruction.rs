@@ -1,5 +1,5 @@
 use crate::cpu::addressing_mode::Reg;
-use crate::cpu::addressing_mode::{Op, CC};
+use crate::cpu::addressing_mode::{CC, Op};
 use crate::cpu::instruction::Operation::*;
 use crate::cpu::{Cpu, CpuBus, Flags};
 use crate::z;

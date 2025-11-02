@@ -1,7 +1,7 @@
 #[cfg(any(test, feature = "test-bus"))]
 pub(crate) mod bus {
-    use crate::bus::{BusIO, InterruptBus};
     use crate::CpuBus;
+    use crate::bus::{BusIO, InterruptBus};
 
     pub struct TestBus {
         pub memory: [u8; 0x10000],

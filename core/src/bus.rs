@@ -267,7 +267,7 @@ impl JoypadBus for MemorySystem {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::timer::{Timer, DMG_DIV_INITIAL_VALUE};
+    use crate::timer::{DMG_DIV_INITIAL_VALUE, Timer};
 
     #[test]
     fn test_read_write_byte() {
