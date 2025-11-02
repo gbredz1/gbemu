@@ -28,7 +28,7 @@ jobs:
         with:
           packages: mold clang pkg-config
             libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0
-            libwayland-dev libxkbcommon-dev
+            libwayland-dev libxkbcommon-dev libfontconfig1-dev
           version: 1.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -47,7 +47,7 @@ jobs:
         with:
           packages: mold clang pkg-config
             libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0
-            libwayland-dev libxkbcommon-dev
+            libwayland-dev libxkbcommon-dev libfontconfig1-dev
           version: 1.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -65,7 +65,7 @@ jobs:
         with:
           packages: mold clang pkg-config
             libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0
-            libwayland-dev libxkbcommon-dev
+            libwayland-dev libxkbcommon-dev libfontconfig1-dev
           version: 1.0
       - uses: Swatinem/rust-cache@v2
         with:
