@@ -228,7 +228,10 @@ impl App {
         Task::none()
     }
     fn open_file(&mut self) -> Task<Message> {
-        let dialog = rfd::FileDialog::new().set_title("Open file").add_filter("ROM", &["gb"]);
+        let dialog = rfd::FileDialog::new()
+            .set_title("Open file")
+            .add_filter("Rom", &["gb", "zip"])
+            .add_filter("All files", &["*"]);
 
         if let Some(path) = dialog.pick_file() {
             self.machine.reset();

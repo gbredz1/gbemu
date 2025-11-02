@@ -8,6 +8,8 @@ publish = false
 bitflags = "2.9"
 log = "0.4"
 paste = "1.0"
+zip = { version = "6.0", default-features = false, features = ["deflate"] }
 
 [features]
 test-bus = []
+use-test-roms = []

@@ -79,32 +79,51 @@ macro_rules! define_palette_accessors {
         }
     };
 }
+use crate::cartridge::Cartridge;
 use crate::joypad::joypad_bus::JoypadBus;
 use crate::timer::timer_bus::TimerBus;
 pub(crate) use define_palette_accessors;
 
 pub struct MemorySystem {
-    memory: Vec<u8>,
     boot_rom: [u8; 0x100],
     boot_rom_enabled: bool,
     boot_rom_loaded: bool,
+
+    vram: [u8; 0x2_000],
+    wram0: [u8; 0x1_000],
+    wram1: [u8; 0x1_000],
+    oam: [u8; 0x100],
+    io_regs: [u8; 0x80],
+    hram: [u8; 0xFF],
+    interrupts: u8,
+    cartridge: Cartridge,
 }
 
 impl MemorySystem {
     pub fn reset(&mut self) {
         // Clear VRAM
-        self.memory[0x8000..=0x9fff].fill(0);
+        self.vram.fill(0);
         self.boot_rom_enabled = self.boot_rom_loaded;
+    }
+    pub(crate) fn cartridge(&self) -> &Cartridge {
+        &self.cartridge
     }
 }
 
 impl Default for MemorySystem {
     fn default() -> Self {
         Self {
-            memory: vec![0xFFu8; 0x1_0000],
             boot_rom_enabled: false,
             boot_rom_loaded: false,
             boot_rom: [0; 0x100],
+            vram: [0; 0x2_000],  // $8000..$9FFF
+            wram0: [0; 0x1_000], // $C000..$CFFF
+            wram1: [0; 0x1_000], // $D000..$DFFF
+            oam: [0; 0x100],     // $FE00..$FE9F
+            io_regs: [0; 0x80],  // $FF00..$FF7F
+            hram: [0; 0xFF],     // $FF80..$FFFE
+            interrupts: 0u8,     // $FFFF
+            cartridge: Cartridge::empty(),
         }
     }
 }
@@ -120,20 +139,29 @@ impl MemorySystem {
         Ok(())
     }
 
-    pub fn load_cartridge<P: AsRef<Path>>(&mut self, path: P) -> Result<usize, std::io::Error> {
-        let mut file = File::open(path)?;
-        let mut rom = vec![];
-        let size = file.read_to_end(&mut rom)?;
-        self.memory[..size].copy_from_slice(&rom[..size]);
-
-        Ok(size)
+    pub fn load_cartridge<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+        self.cartridge = Cartridge::load_from_path(path)?;
+        Ok(())
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
         if self.boot_rom_enabled && address < 0x100 {
             unsafe { *self.boot_rom.get_unchecked(address as usize) }
         } else {
-            unsafe { *self.memory.get_unchecked(address as usize) }
+            match address {
+                0x0000..=0x3FFF => self.cartridge.read_byte(address), // ROM BANK 00
+                0x4000..=0x7FFF => self.cartridge.read_byte(address), // ROM BANK 01-NN
+                0x8000..=0x9FFF => self.vram[address as usize - 0x8000], // VRAM
+                0xA000..=0xBFFF => self.cartridge.read_byte(address), // External RAM
+                0xC000..=0xCFFF => self.wram0[address as usize - 0xC000], // WRAM 0
+                0xD000..=0xDFFF => self.wram1[address as usize - 0xD000], // WRAM 1
+                0xE000..=0xFDFF => 0xFF,                              // ECHO RAM
+                0xFE00..=0xFE9F => self.oam[address as usize - 0xFE00], // OAM
+                0xFEA0..=0xFEFF => 0xFF,                              // Not usable
+                0xFF00..=0xFF7F => self.io_regs[address as usize - 0xFF00], // IO regs
+                0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80], // HRAM
+                0xFFFF => self.interrupts,                            // Interrupts
+            }
         }
     }
 
@@ -169,8 +197,19 @@ impl MemorySystem {
 
     #[inline(always)]
     pub fn write_internal_byte(&mut self, address: u16, byte: u8) {
-        unsafe {
-            *self.memory.get_unchecked_mut(address as usize) = byte;
+        match address {
+            0x0000..=0x3FFF => self.cartridge.write_byte(address, byte), // ROM BANK 00
+            0x4000..=0x7FFF => self.cartridge.write_byte(address, byte), // ROM BANK 01-NN
+            0x8000..=0x9FFF => self.vram[address as usize - 0x8000] = byte, // VRAM
+            0xA000..=0xBFFF => self.cartridge.write_byte(address, byte), // External RAM
+            0xC000..=0xCFFF => self.wram0[address as usize - 0xC000] = byte, // WRAM 0
+            0xD000..=0xDFFF => self.wram1[address as usize - 0xD000] = byte, // WRAM 1
+            0xE000..=0xFDFF => {}                                        // ECHO RAM
+            0xFE00..=0xFE9F => self.oam[address as usize - 0xFE00] = byte, // OAM
+            0xFEA0..=0xFEFF => {}                                        // Not usable
+            0xFF00..=0xFF7F => self.io_regs[address as usize - 0xFF00] = byte, // IO regs
+            0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80] = byte, // HRAM
+            0xFFFF => self.interrupts = byte,                            // Interruptsmake
         }
     }
 

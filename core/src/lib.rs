@@ -1,4 +1,5 @@
 pub(crate) mod bus;
+pub(crate) mod cartridge;
 pub(crate) mod cpu;
 pub(crate) mod debug;
 pub(crate) mod joypad;

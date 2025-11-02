@@ -1,4 +1,5 @@
 use crate::bus::{InterruptBus, MemorySystem};
+use crate::cartridge::Cartridge;
 use crate::cpu::Cpu;
 use crate::debug::breakpoint::BreakpointManager;
 use crate::joypad;
@@ -25,7 +26,7 @@ impl Machine {
         self.start_addr = Some(0x0000);
         self.bus.load_boot_rom()
     }
-    pub fn load_cartridge<P: AsRef<Path>>(&mut self, path: P) -> Result<usize, std::io::Error> {
+    pub fn load_cartridge<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
         info!("Loading cartridge: {:?}", path.as_ref());
         self.bus.load_cartridge(path)
     }
@@ -38,6 +39,9 @@ impl Machine {
     }
     pub fn bus(&self) -> &MemorySystem {
         &self.bus
+    }
+    pub fn cartridge(&self) -> &Cartridge {
+        self.bus.cartridge()
     }
 
     pub fn breakpoint_manager(&self) -> &BreakpointManager {
