@@ -155,7 +155,8 @@ impl MemorySystem {
                 0xA000..=0xBFFF => self.cartridge.read_byte(address), // External RAM
                 0xC000..=0xCFFF => self.wram0[address as usize - 0xC000], // WRAM 0
                 0xD000..=0xDFFF => self.wram1[address as usize - 0xD000], // WRAM 1
-                0xE000..=0xFDFF => 0xFF,                              // ECHO RAM
+                0xE000..=0xEFFF => self.wram0[address as usize - 0xE000], // ECHO -> WRAM 0
+                0xF000..=0xFDFF => self.wram1[address as usize - 0xF000], // ECHO -> WRAM 1
                 0xFE00..=0xFE9F => self.oam[address as usize - 0xFE00], // OAM
                 0xFEA0..=0xFEFF => 0xFF,                              // Not usable
                 0xFF00..=0xFF7F => self.io_regs[address as usize - 0xFF00], // IO regs
@@ -204,7 +205,8 @@ impl MemorySystem {
             0xA000..=0xBFFF => self.cartridge.write_byte(address, byte), // External RAM
             0xC000..=0xCFFF => self.wram0[address as usize - 0xC000] = byte, // WRAM 0
             0xD000..=0xDFFF => self.wram1[address as usize - 0xD000] = byte, // WRAM 1
-            0xE000..=0xFDFF => {}                                        // ECHO RAM
+            0xE000..=0xEFFF => self.wram0[address as usize - 0xE000] = byte, // ECHO -> WRAM 0
+            0xF000..=0xFDFF => self.wram1[address as usize - 0xF000] = byte, // ECHO -> WRAM 1
             0xFE00..=0xFE9F => self.oam[address as usize - 0xFE00] = byte, // OAM
             0xFEA0..=0xFEFF => {}                                        // Not usable
             0xFF00..=0xFF7F => self.io_regs[address as usize - 0xFF00] = byte, // IO regs
@@ -360,5 +362,28 @@ mod tests {
         assert_eq!(bus.div(), 0);
         timer.step(&mut bus, 1);
         assert_eq!(bus.div(), 1);
+    }
+
+    #[test]
+    fn test_echo_ram() {
+        // WRAM0    : C000..CFFF
+        // WRAM1    : D000..DFFF
+        // ECHORAM  : E000..FDFF
+        //    => E000..EFFF => WRAM0 [0..FFF]
+        //    => F000..FDFF => WRAM1 [0..DFF]
+
+        let mut bus = MemorySystem::default();
+        for i in 0..=(0xFFF + 0xDFF) {
+            let byte = (1 + i) as u8;
+
+            // write WRAM => ECHO
+            bus.write_byte(0xC000 + i, byte);
+            assert_eq!(bus.read_byte(0xE000 + i), byte);
+
+            // Write ECHO => WRAM
+            let byte = byte.wrapping_add_signed(1);
+            bus.write_byte(0xE000 + i, byte);
+            assert_eq!(bus.read_byte(0xC000 + i), byte);
+        }
     }
 }
