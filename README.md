@@ -3,7 +3,9 @@ Written in Rust, using *iced* for main GUI and terminal version with *Ratatui*.
 This project serves as a personal learning exercise to learn and gain experience with both libraries.
 
 ### :construction: WORK IN PROGRESS :construction:
-:warning: Emulator not running at this stage.
+:warning: The emulator currently runs only some games, and graphical glitches are present
+
+- MBC1 mapper implementation passes the [Mooneye test suite](https://github.com/Gekkio/mooneye-test-suite) ✅
 
 ### Build and Run
 #### Iced Frontend
