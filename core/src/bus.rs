@@ -276,8 +276,8 @@ mod tests {
         let mut memory = MemorySystem::default();
 
         let test_cases = vec![
-            (0x1234, 0xAB, "at a specific address"),
-            (0x0000, 0x42, "at address 0"),
+            (0x8000, 0xAB, "at vram start $0"),
+            (0x9FFF, 0x42, "at vram end $9FFF"),
             (0xFFFF, 0x55, "at the highest address"),
         ];
 
@@ -296,8 +296,8 @@ mod tests {
     fn test_read_write_word() {
         let mut memory = MemorySystem::default();
         let test_cases = vec![
-            (0x1234, 0xABCD, "at a specific address"),
-            (0x0000, 0x4242, "at address 0"),
+            (0x8000, 0xAB, "at vram start $0"),
+            (0x9FFE, 0x42, "at vram end $9FFE"),
             (0xFFFE, 0x5555, "at the highest address"),
         ];
         for (address, value, description) in test_cases {
