@@ -2,9 +2,9 @@ use gbemu_core::Machine;
 
 use crate::theme::color::{green, orange, pink, purple, yellow};
 use iced::alignment::{Horizontal, Vertical};
-use iced::widget::{Row, Space, button, column, container, horizontal_space, row, text, text_input};
+use iced::widget::{Row, Space, button, column, container, row, text, text_input};
 use iced::{Element, Fill, Task};
-use iced_aw::{grid, grid_row};
+use iced_widget::space::horizontal;
 
 pub struct State {
     input_string: String,
@@ -88,19 +88,19 @@ macro_rules! memory_row {
         $v4:expr, $v5:expr, $v6:expr, $v7:expr) => {
         row![
             $f($v0),
-            Space::with_width(SPACE_BYTE),
+            Space::new().width(SPACE_BYTE),
             $f($v1),
-            Space::with_width(SPACE_BYTE),
+            Space::new().width(SPACE_BYTE),
             $f($v2),
-            Space::with_width(SPACE_BYTE),
+            Space::new().width(SPACE_BYTE),
             $f($v3),
-            Space::with_width(SPACE_BYTE_4),
+            Space::new().width(SPACE_BYTE_4),
             $f($v4),
-            Space::with_width(SPACE_BYTE),
+            Space::new().width(SPACE_BYTE),
             $f($v5),
-            Space::with_width(SPACE_BYTE),
+            Space::new().width(SPACE_BYTE),
             $f($v6),
-            Space::with_width(SPACE_BYTE),
+            Space::new().width(SPACE_BYTE),
             $f($v7),
         ]
     };
@@ -122,9 +122,9 @@ macro_rules! memory_row_addr {
 }
 
 pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
-    const SIZE: u16 = 12;
-    const SPACE_BYTE: u16 = 4; // macro
-    const SPACE_BYTE_4: u16 = 7; // macro
+    const SIZE: u32 = 12;
+    const SPACE_BYTE: f32 = 4.0; // macro
+    const SPACE_BYTE_4: f32 = 7.0; // macro
 
     const ADDR_COUNT: usize = 16;
 
@@ -168,7 +168,7 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
             .on_input(Message::InputChanged),
         button_increment,
         button_increment10,
-        horizontal_space(),
+        horizontal(),
         row![
             button(text("SP").size(SIZE).color(pink()))
                 .padding(2)
@@ -205,7 +205,7 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
             ),
         ]
         .wrap(),
-        horizontal_space(),
+        horizontal(),
     ]
     .align_y(Vertical::Center);
 
@@ -217,8 +217,6 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
         memory_row!(mem_header, "08", "09", "0A", "0B", "0C", "0D", "0E", "0F"),
     ]
     .spacing(10);
-
-    let mut grid = grid!();
 
     let offset = state.addr_start as usize;
     let range: Vec<usize> = (offset..)
@@ -247,21 +245,22 @@ pub fn view<'a>(state: &State, machine: &Machine) -> Element<'a, Message> {
         text(format!("{value}")).size(SIZE).into()
     };
 
+    let mut grid = column![];
     for addr in range {
         let addr = addr as u16;
-        grid = grid.push(grid_row!(
-            horizontal_space(),
-            text(format!("${addr:04X}")).size(SIZE).width(50).color(orange()),
+
+        let line = row![
+            Space::new(),
+            text(format!("${addr:04X}")).size(SIZE).width(50.0).color(orange()),
             memory_row_addr!(mem_byte, addr),
             memory_row_addr!(mem_byte, addr + 8),
             Row::from_vec((0..=0xF).map(|i| mem_ascii(addr.wrapping_add(i))).collect()),
-        ));
+        ]
+        .spacing(10);
+        grid = grid.push(line);
     }
 
-    grid = grid.column_spacing(10);
-
     let content = container(column![header, grid]).width(Fill);
-
     column![controls, content].spacing(10).padding(8).into()
 }
 

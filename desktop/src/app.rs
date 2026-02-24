@@ -7,15 +7,16 @@ use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Subscription, Task, keyboard, time, window};
+use iced_core::keyboard::{Event, Key};
 use log::error;
 use std::time::{Duration, Instant};
 
 // Application constants
 const DEFAULT_BREAKPOINT: &str = "00e9";
 const UPDATE_INTERVAL_MS: u64 = 30;
-const BUTTON_SPACING: u16 = 8;
-const COLUMN_SPACING: u16 = 10;
-const CONTENT_PADDING: u16 = 10;
+const BUTTON_SPACING: f32 = 8.0;
+const COLUMN_SPACING: f32 = 10.0;
+const CONTENT_PADDING: f32 = 10.0;
 
 pub(crate) struct App {
     pub machine: Machine,
@@ -78,37 +79,53 @@ impl App {
             subscriptions.push(time::every(Duration::from_millis(UPDATE_INTERVAL_MS)).map(Message::Tick));
         };
 
-        subscriptions.push(keyboard::on_key_press(|key, _modifiers| match key.as_ref() {
-            keyboard::Key::Named(Named::F7) => Some(Message::Step),
-            keyboard::Key::Character("r") => Some(Message::Reset),
-            keyboard::Key::Named(Named::F10) => Some(Message::StepFrame),
-            keyboard::Key::Named(Named::Space) => Some(Message::TogglePlayback),
-            keyboard::Key::Named(Named::Escape) => Some(Message::CloseWindow),
-            keyboard::Key::Character("l") => Some(Message::OpenFile),
+        subscriptions.push(keyboard::listen().filter_map(|event| {
+            if let Event::KeyPressed {
+                key,
+                modifiers: _modifiers,
+                ..
+            } = event
+            {
+                match key.as_ref() {
+                    Key::Named(Named::F7) => Some(Message::Step),
+                    Key::Character("r") => Some(Message::Reset),
+                    Key::Named(Named::F10) => Some(Message::StepFrame),
+                    Key::Named(Named::Space) => Some(Message::TogglePlayback),
+                    Key::Named(Named::Escape) => Some(Message::CloseWindow),
+                    Key::Character("l") => Some(Message::OpenFile),
 
-            keyboard::Key::Named(Named::ArrowUp) => Some(Message::ButtonsPressed(JoypadButton::Up)),
-            keyboard::Key::Named(Named::ArrowDown) => Some(Message::ButtonsPressed(JoypadButton::Down)),
-            keyboard::Key::Named(Named::ArrowLeft) => Some(Message::ButtonsPressed(JoypadButton::Left)),
-            keyboard::Key::Named(Named::ArrowRight) => Some(Message::ButtonsPressed(JoypadButton::Right)),
-            keyboard::Key::Character("d") => Some(Message::ButtonsPressed(JoypadButton::A)),
-            keyboard::Key::Character("f") => Some(Message::ButtonsPressed(JoypadButton::B)),
-            keyboard::Key::Character("c") => Some(Message::ButtonsPressed(JoypadButton::Start)),
-            keyboard::Key::Character("v") => Some(Message::ButtonsPressed(JoypadButton::Select)),
+                    Key::Named(Named::ArrowUp) => Some(Message::ButtonsPressed(JoypadButton::Up)),
+                    Key::Named(Named::ArrowDown) => Some(Message::ButtonsPressed(JoypadButton::Down)),
+                    Key::Named(Named::ArrowLeft) => Some(Message::ButtonsPressed(JoypadButton::Left)),
+                    Key::Named(Named::ArrowRight) => Some(Message::ButtonsPressed(JoypadButton::Right)),
+                    Key::Character("d") => Some(Message::ButtonsPressed(JoypadButton::A)),
+                    Key::Character("f") => Some(Message::ButtonsPressed(JoypadButton::B)),
+                    Key::Character("c") => Some(Message::ButtonsPressed(JoypadButton::Start)),
+                    Key::Character("v") => Some(Message::ButtonsPressed(JoypadButton::Select)),
 
-            _ => None,
-        }));
+                    _ => None,
+                }
+            } else if let Event::KeyReleased {
+                key,
+                modifiers: _modifiers,
+                ..
+            } = event
+            {
+                match key.as_ref() {
+                    Key::Named(Named::ArrowUp) => Some(Message::ButtonsReleased(JoypadButton::Up)),
+                    Key::Named(Named::ArrowDown) => Some(Message::ButtonsReleased(JoypadButton::Down)),
+                    Key::Named(Named::ArrowLeft) => Some(Message::ButtonsReleased(JoypadButton::Left)),
+                    Key::Named(Named::ArrowRight) => Some(Message::ButtonsReleased(JoypadButton::Right)),
+                    Key::Character("d") => Some(Message::ButtonsReleased(JoypadButton::A)),
+                    Key::Character("f") => Some(Message::ButtonsReleased(JoypadButton::B)),
+                    Key::Character("c") => Some(Message::ButtonsReleased(JoypadButton::Start)),
+                    Key::Character("v") => Some(Message::ButtonsReleased(JoypadButton::Select)),
 
-        subscriptions.push(keyboard::on_key_release(|key, _modifiers| match key.as_ref() {
-            keyboard::Key::Named(Named::ArrowUp) => Some(Message::ButtonsReleased(JoypadButton::Up)),
-            keyboard::Key::Named(Named::ArrowDown) => Some(Message::ButtonsReleased(JoypadButton::Down)),
-            keyboard::Key::Named(Named::ArrowLeft) => Some(Message::ButtonsReleased(JoypadButton::Left)),
-            keyboard::Key::Named(Named::ArrowRight) => Some(Message::ButtonsReleased(JoypadButton::Right)),
-            keyboard::Key::Character("d") => Some(Message::ButtonsReleased(JoypadButton::A)),
-            keyboard::Key::Character("f") => Some(Message::ButtonsReleased(JoypadButton::B)),
-            keyboard::Key::Character("c") => Some(Message::ButtonsReleased(JoypadButton::Start)),
-            keyboard::Key::Character("v") => Some(Message::ButtonsReleased(JoypadButton::Select)),
-
-            _ => None,
+                    _ => None,
+                }
+            } else {
+                None
+            }
         }));
 
         Subscription::batch(subscriptions)
@@ -123,7 +140,7 @@ impl App {
             Message::Reset => self.do_reset(),
 
             // User interface
-            Message::CloseWindow => window::get_latest().and_then(window::close),
+            Message::CloseWindow => window::latest().and_then(window::close),
             Message::OpenFile => self.open_file(),
 
             // Breakpoint management
@@ -146,7 +163,7 @@ impl App {
             }
         }
     }
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         let controls = view_control_panel(self.is_running, self);
 
         let cpu_state = title_panel("CPU", view_cpu::view(self.machine.cpu())).center_x(200);

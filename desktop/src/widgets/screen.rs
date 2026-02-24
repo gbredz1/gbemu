@@ -30,8 +30,8 @@ impl Screen {
             cache: &self.cache,
             frame_buffer,
         })
-        .width(Self::WIDTH as u16)
-        .height(Self::HEIGHT as u16 + 1)
+        .width(Self::WIDTH as f32)
+        .height(Self::HEIGHT as f32 + 1.0)
         .into()
     }
 

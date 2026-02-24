@@ -6,30 +6,28 @@ use iced::alignment::Horizontal;
 use iced::widget::{Space, column, row, text};
 
 pub fn view<'a>(machine: &Machine) -> Element<'a, Message> {
-    const SIZE: u16 = 12;
+    const SIZE: u32 = 12;
 
-    let title = |title: &'a str| -> iced::advanced::widget::Text<'a, _, _> {
-        text(format!("{title}:")).color(purple()).size(SIZE)
-    };
+    let title = |title: &'a str| -> iced::widget::Text<'a> { text(format!("{title}:")).color(purple()).size(SIZE) };
     let io_reg8 = |name: &'a str, addr: u16, val: u8| -> Element<'a, Message> {
         row![
-            Space::with_width(10.0),
+            Space::new().width(10.0),
             text(format!("${addr:04X}")).color(orange()).size(SIZE),
-            Space::with_width(10.0),
+            Space::new().width(10.0),
             text(name).color(green()).width(60).size(SIZE),
             text(format!("${val:02X}")).size(SIZE),
-            Space::with_width(10.0),
+            Space::new().width(10.0),
             text(format!("({:04b}", val >> 4)).size(SIZE),
-            Space::with_width(4.0),
+            Space::new().width(4.0),
             text(format!("{:04b})", val & 0xF)).size(SIZE),
         ]
         .into()
     };
     let io_reg16 = |name: &'a str, addr: u16, val: u16| -> Element<'a, Message> {
         row![
-            Space::with_width(10.0),
+            Space::new().width(10.0),
             text(format!("${addr:04X}")).color(orange()).size(SIZE),
-            Space::with_width(10.0),
+            Space::new().width(10.0),
             text(name).color(orange()).width(60).size(SIZE),
             text(format!("${val:04X}")).size(SIZE),
         ]
@@ -37,7 +35,7 @@ pub fn view<'a>(machine: &Machine) -> Element<'a, Message> {
     };
     let io_reg_flag = |name: &'a str, val_if, val_ie: bool| -> Element<'a, Message> {
         row![
-            Space::with_width(15.0),
+            Space::new().width(15.0),
             text(name).color(orange()).width(60).size(SIZE),
             if val_if {
                 text("On").width(40).color(red()).size(SIZE)
@@ -45,11 +43,11 @@ pub fn view<'a>(machine: &Machine) -> Element<'a, Message> {
                 text("Off").width(40).color(blue()).size(SIZE)
             },
             text("IF").color(blue()).size(SIZE),
-            Space::with_width(8.0),
+            Space::new().width(8.0),
             text(if val_if { "1" } else { "0" }).size(SIZE),
-            Space::with_width(15.0),
+            Space::new().width(15.0),
             text("IE").color(blue()).size(SIZE),
-            Space::with_width(8.0),
+            Space::new().width(8.0),
             text(if val_ie { "1" } else { "0" }).size(SIZE),
         ]
         .into()
@@ -83,7 +81,7 @@ pub fn view<'a>(machine: &Machine) -> Element<'a, Message> {
             io_reg8("RP", 0xFF56, machine.bus().read_byte(0xFF56)),
         ]
         .align_x(Horizontal::Left),
-        Space::with_width(10.0),
+        Space::new().width(10.0),
         column![
             title("LCD"),
             io_reg8("LCDC", 0xFF40, machine.bus().read_byte(0xFF40)),

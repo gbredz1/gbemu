@@ -1,12 +1,12 @@
 use crate::app::Message;
 use crate::theme::color::{blue, green, orange};
 use gbemu_core::{Cpu, CpuFlags};
-use iced::Element;
 use iced::alignment::Horizontal;
-use iced::widget::{Space, row, text};
+use iced::widget::{row, text, Space};
+use iced::Element;
 
 pub fn view<'a>(cpu: &Cpu) -> Element<'a, Message> {
-    const SIZE: u16 = 12;
+    const SIZE: u32 = 12;
 
     let reg8 = |name: &'a str, value: u8| -> Element<'a, Message> {
         iced::widget::column![
@@ -18,7 +18,7 @@ pub fn view<'a>(cpu: &Cpu) -> Element<'a, Message> {
             .spacing(10),
             row![
                 text(format!("{:04b}", value >> 4)).size(SIZE),
-                Space::with_width(3.0),
+                Space::new().width(3.0),
                 text(format!("{:04b}", value & 0xF)).size(SIZE)
             ]
         ]
@@ -35,11 +35,11 @@ pub fn view<'a>(cpu: &Cpu) -> Element<'a, Message> {
             .spacing(10),
             row![
                 text(format!("{:04b}", (value >> 12) & 0xF)).size(SIZE),
-                Space::with_width(3.0),
+                Space::new().width(3.0),
                 text(format!("{:04b}", (value >> 8) & 0xF)).size(SIZE),
-                Space::with_width(6.0),
+                Space::new().width(6.0),
                 text(format!("{:04b}", (value >> 4) & 0xF)).size(SIZE),
-                Space::with_width(3.0),
+                Space::new().width(3.0),
                 text(format!("{:04b}", value & 0xF)).size(SIZE)
             ]
         ]
