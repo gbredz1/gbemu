@@ -88,12 +88,11 @@ impl Cpu {
             }
         };
 
-        let mut data = vec![];
-        for _ in 1..instruction.size {
-            data.push(self.pc_read_byte(bus));
+        let mut data = [0u8; 2];
+        for i in 1..(instruction.size as usize) {
+            data[i - 1] = self.pc_read_byte(bus);
         }
-
-        Ok(instruction.execute(self, bus, &data))
+        Ok(instruction.execute(self, bus, &data[..(instruction.size as usize) - 1]))
     }
 
     pub(crate) fn fetch_cb_instruction(&mut self, bus: &mut impl CpuBus) -> Result<u8, String> {
