@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 // Application constants
 const DEFAULT_BREAKPOINT: &str = "00e9";
-const UPDATE_INTERVAL_MS: u64 = 30;
+const GB_FRAME_DURATION: Duration = Duration::from_nanos(16_742_706); // 1/59.7275 s
 const BUTTON_SPACING: f32 = 8.0;
 const COLUMN_SPACING: f32 = 10.0;
 const CONTENT_PADDING: f32 = 10.0;
@@ -76,7 +76,7 @@ impl App {
     pub fn subscription(&self) -> Subscription<Message> {
         let mut subscriptions = vec![];
         if self.is_running {
-            subscriptions.push(time::every(Duration::from_millis(UPDATE_INTERVAL_MS)).map(Message::Tick));
+            subscriptions.push(time::every(GB_FRAME_DURATION).map(Message::Tick));
         };
 
         subscriptions.push(keyboard::listen().filter_map(|event| {

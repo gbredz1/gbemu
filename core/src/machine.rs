@@ -58,7 +58,7 @@ impl Machine {
         let mut total_cycles: usize = 0;
         let mut breakpoint_hit = false;
 
-        for _ in 0..CYCLES_PER_FRAME {
+        while total_cycles < CYCLES_PER_FRAME {
             total_cycles += self.step()? as usize;
 
             if self.breakpoint_manager.has_breakpoint(self.cpu.pc()) {
