@@ -64,6 +64,7 @@ struct App {
     exit: bool,
 }
 
+const GB_FRAME_DURATION: Duration = Duration::from_nanos(16_742_706); // 1/59.7275 s
 impl App {
     pub fn load(&mut self, path: &str) -> io::Result<()> {
         self.machine.load_cartridge(path)?;
@@ -74,7 +75,6 @@ impl App {
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         let mut delta = Duration::from_nanos(0);
-        let target_frame_time = Duration::from_secs_f64(1.0 / 30.0);
 
         while !self.exit {
             let frame_start = Instant::now();
@@ -85,8 +85,8 @@ impl App {
 
             delta = frame_start.elapsed();
 
-            if delta < target_frame_time {
-                sleep(target_frame_time - delta);
+            if delta < GB_FRAME_DURATION {
+                sleep(GB_FRAME_DURATION - delta);
             }
         }
         Ok(())

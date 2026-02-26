@@ -8,8 +8,8 @@ pub struct ScreenView<'a> {
     image: &'a [u8],
 }
 
-impl<'a> From<&'a Vec<u8>> for ScreenView<'a> {
-    fn from(image: &'a Vec<u8>) -> Self {
+impl<'a> From<&'a [u8]> for ScreenView<'a> {
+    fn from(image: &'a [u8]) -> Self {
         Self { image }
     }
 }
