@@ -53,7 +53,7 @@ bitflags! {
     /// Specifies the top 8 bits of the OAM DMA source addr
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct DMA: u8 {
-        const DMA_7 = 0b0100_0000;
+        const DMA_7 = 0b1000_0000;
         const DMA_6 = 0b0100_0000;
         const DMA_5 = 0b0010_0000;
         const DMA_4 = 0b0001_0000;
