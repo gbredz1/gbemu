@@ -466,7 +466,7 @@ impl Instruction {
                 cpu.set_flag_if(Flags::H, cpu.a() & 0xF < val & 0xF);
                 cpu.set_flag_if(Flags::C, carry);
 
-                self.size
+                self.cycles
             }
             CPL => {
                 cpu.set_a(0xFF ^ cpu.a());
@@ -582,7 +582,7 @@ impl Instruction {
                 let val_u8 = read_operand_value_u8!(cpu, bus, data, op2); // A | (n) | (C)
                 write_to_operand_u8!(cpu, bus, data, op1, val_u8); // A | (n) | (C)
 
-                self.size
+                self.cycles
             }
 
             RST(v) => {
