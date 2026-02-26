@@ -25,7 +25,7 @@ impl Screen {
 
         Task::none()
     }
-    pub fn view<'a>(&'a self, frame_buffer: &'a Vec<u8>) -> Element<'a, Message> {
+    pub fn view<'a>(&'a self, frame_buffer: &'a [u8]) -> Element<'a, Message> {
         canvas(ScreenCanvas {
             cache: &self.cache,
             frame_buffer,
@@ -42,7 +42,7 @@ impl Screen {
 
 struct ScreenCanvas<'a> {
     cache: &'a canvas::Cache,
-    frame_buffer: &'a Vec<u8>,
+    frame_buffer: &'a [u8],
 }
 impl<'a> canvas::Program<Message> for ScreenCanvas<'a> {
     type State = ();

@@ -17,14 +17,14 @@ pub(crate) struct Ppu {
     sprites_visibles_on_current_line: Vec<Sprite>,
 
     // buffer
-    pub frame_buffer: Vec<u8>,
+    pub frame_buffer: [u8; LCD_WIDTH as usize * LCD_HEIGHT as usize],
 }
 
 impl Default for Ppu {
     fn default() -> Self {
         Self {
             mode_clock: 0,
-            frame_buffer: vec![0; LCD_WIDTH as usize * LCD_HEIGHT as usize],
+            frame_buffer: [0; LCD_WIDTH as usize * LCD_HEIGHT as usize],
             sprites_visibles_on_current_line: Vec::with_capacity(10),
         }
     }

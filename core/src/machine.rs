@@ -31,7 +31,7 @@ impl Machine {
         self.bus.load_cartridge(path)
     }
 
-    pub fn frame(&self) -> &Vec<u8> {
+    pub fn frame(&self) -> &[u8] {
         &self.ppu.frame_buffer
     }
     pub fn cpu(&self) -> &Cpu {
