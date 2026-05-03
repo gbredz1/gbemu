@@ -1,0 +1,48 @@
+@charset "utf-8";
+
+$gb-bg: #e8e8d0;
+$gb-dark: #4a5540;
+$gb-light: #c4cfa1;
+$gb-screen: #9bbc0f;
+
+html, body {
+  margin:0;
+  padding: 20px;
+  background: $gb-bg;
+  font-family: 'Courier New', monospace;
+}
+
+.container {
+  max-width: 500px;
+  margin:0;
+}
+
+#screen {
+  display: block;
+  background: $gb-screen;
+  image-rendering: pixelated;
+  width: 320px;
+  height: 288px;
+  max-width: 100%;
+  border: 2px solid $gb-dark;
+}
+
+.controls {
+  margin-top: 10px;
+}
+
+.buttons-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+input, button {
+  font-family: 'Courier New', monospace;
+  padding: 8px 12px;
+  border: 2px solid $gb-dark;
+  background: $gb-light;
+  color: $gb-dark;
+  cursor: pointer;
+  font-weight: bold;
+}

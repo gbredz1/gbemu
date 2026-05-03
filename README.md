@@ -34,3 +34,15 @@ cargo run --release --bin gbemu-term -- roms/test.gb
 ```
 
 ![terminal screenshot](https://i.ibb.co/bR1SBNjz/screenshot-002.png)
+
+
+#### Wasm
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install --locked trunk
+
+cd wasm ; trunk serve
+```
+
+![wasm screenhost](https://i.ibb.co/0gPDTpw/screenshot-003.png)

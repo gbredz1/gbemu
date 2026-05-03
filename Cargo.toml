@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["term", "core", "desktop", "doctor"]
+members = ["term", "core", "desktop", "doctor", "wasm"]
 default-members = [
     "desktop",
     "term",
