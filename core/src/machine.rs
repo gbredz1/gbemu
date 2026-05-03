@@ -2,10 +2,10 @@ use crate::bus::{InterruptBus, MemorySystem};
 use crate::cartridge::Cartridge;
 use crate::cpu::Cpu;
 use crate::debug::breakpoint::BreakpointManager;
-use crate::joypad;
 use crate::joypad::Joypad;
 use crate::ppu::Ppu;
 use crate::timer::Timer;
+use crate::{joypad, CYCLES_PER_FRAME};
 use log::info;
 use std::error::Error;
 use std::path::Path;
@@ -53,8 +53,6 @@ impl Machine {
     }
 
     pub fn step_frame(&mut self) -> Result<(usize, bool), Box<dyn Error>> {
-        const CYCLES_PER_FRAME: usize = 70224;
-
         let mut total_cycles: usize = 0;
         let mut breakpoint_hit = false;
 

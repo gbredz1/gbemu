@@ -1,16 +1,16 @@
 mod screen_view;
 
-use crate::screen_view::{SCREEN_HEIGHT, SCREEN_WIDTH, ScreenView};
+use crate::screen_view::{ScreenView, SCREEN_HEIGHT, SCREEN_WIDTH};
 use clap::Parser;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
 use crossterm::terminal::supports_keyboard_enhancement;
 use crossterm::{event, execute};
-use gbemu_core::{JoypadButton, Machine};
+use gbemu_core::{JoypadButton, Machine, FRAME_DURATION};
 use log::{debug, error};
-use ratatui::DefaultTerminal;
 use ratatui::prelude::*;
 use ratatui::symbols::Marker;
 use ratatui::widgets::canvas::Canvas;
+use ratatui::DefaultTerminal;
 use std::io;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -64,7 +64,6 @@ struct App {
     exit: bool,
 }
 
-const GB_FRAME_DURATION: Duration = Duration::from_nanos(16_742_706); // 1/59.7275 s
 impl App {
     pub fn load(&mut self, path: &str) -> io::Result<()> {
         self.machine.load_cartridge(path)?;
@@ -85,8 +84,8 @@ impl App {
 
             delta = frame_start.elapsed();
 
-            if delta < GB_FRAME_DURATION {
-                sleep(GB_FRAME_DURATION - delta);
+            if delta < FRAME_DURATION {
+                sleep(FRAME_DURATION - delta);
             }
         }
         Ok(())

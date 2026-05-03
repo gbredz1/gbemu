@@ -1,19 +1,18 @@
 use crate::views::*;
 use crate::widgets::screen::Screen;
 use crate::widgets::{screen, title_panel};
-use gbemu_core::{JoypadButton, Machine};
+use gbemu_core::{JoypadButton, Machine, FRAME_DURATION};
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::key::Named;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Element, Subscription, Task, keyboard, time, window};
+use iced::{keyboard, time, window, Element, Subscription, Task};
 use iced_core::keyboard::{Event, Key};
 use log::error;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 // Application constants
 const DEFAULT_BREAKPOINT: &str = "00e9";
-const GB_FRAME_DURATION: Duration = Duration::from_nanos(16_742_706); // 1/59.7275 s
 const BUTTON_SPACING: f32 = 8.0;
 const COLUMN_SPACING: f32 = 10.0;
 const CONTENT_PADDING: f32 = 10.0;
@@ -76,7 +75,7 @@ impl App {
     pub fn subscription(&self) -> Subscription<Message> {
         let mut subscriptions = vec![];
         if self.is_running {
-            subscriptions.push(time::every(GB_FRAME_DURATION).map(Message::Tick));
+            subscriptions.push(time::every(FRAME_DURATION).map(Message::Tick));
         };
 
         subscriptions.push(keyboard::listen().filter_map(|event| {
