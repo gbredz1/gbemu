@@ -144,6 +144,11 @@ impl MemorySystem {
         Ok(())
     }
 
+    pub fn load_cartridge_from_bytes(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
+        self.cartridge = Cartridge::load_from_bytes(data)?;
+        Ok(())
+    }
+
     pub fn read_byte(&self, address: u16) -> u8 {
         if self.boot_rom_enabled && address < 0x100 {
             unsafe { *self.boot_rom.get_unchecked(address as usize) }
@@ -161,7 +166,7 @@ impl MemorySystem {
                 0xFEA0..=0xFEFF => 0xFF,                              // Not usable
                 0xFF00..=0xFF7F => self.io_regs[address as usize - 0xFF00], // IO regs
                 0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80], // HRAM
-                0xFFFF => self.interrupts,                            // Interrupts
+                _ => self.interrupts,                                 // Interrupts (0xFFFF)
             }
         }
     }
@@ -211,7 +216,7 @@ impl MemorySystem {
             0xFEA0..=0xFEFF => {}                                        // Not usable
             0xFF00..=0xFF7F => self.io_regs[address as usize - 0xFF00] = byte, // IO regs
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80] = byte, // HRAM
-            0xFFFF => self.interrupts = byte,                            // Interruptsmake
+            _ => self.interrupts = byte,                                 // Interrupts (0xFFFF)
         }
     }
 
@@ -269,7 +274,7 @@ impl JoypadBus for MemorySystem {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::timer::{DMG_DIV_INITIAL_VALUE, Timer};
+    use crate::timer::{Timer, DMG_DIV_INITIAL_VALUE};
 
     #[test]
     fn test_read_write_byte() {

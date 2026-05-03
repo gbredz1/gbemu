@@ -10,7 +10,7 @@ use headers::Headers;
 use log::debug;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{Error, Read};
+use std::io::{Error, Read, Seek};
 use std::path::Path;
 
 pub struct Cartridge {
@@ -34,6 +34,22 @@ impl Cartridge {
             _ => panic!("unsupported file type"),
         };
 
+        Self::parse_rom(rom)
+    }
+
+    pub fn load_from_bytes(data: &[u8]) -> Result<Cartridge, Error> {
+        const ZIP_MAGIC: &[u8; 4] = b"PK\x03\x04";
+
+        let (rom, _) = if data.starts_with(ZIP_MAGIC) {
+            Self::read_zip(std::io::Cursor::new(data))?
+        } else {
+            (data.to_vec(), data.len())
+        };
+
+        Self::parse_rom(rom)
+    }
+
+    fn parse_rom(rom: Vec<u8>) -> Result<Cartridge, Error> {
         let title = &rom[Headers::ROM_TITLE];
         let title = String::from_utf8_lossy(title).trim_end_matches('\0').to_string();
         let (ram_banks, ram_size): (usize, usize) = match rom[Headers::RAM_SIZE] {
@@ -97,9 +113,9 @@ impl Cartridge {
         Ok((rom, rom_size))
     }
 
-    fn read_zip(file: File) -> Result<(Vec<u8>, usize), Error> {
+    fn read_zip<R: Read + Seek>(reader: R) -> Result<(Vec<u8>, usize), Error> {
         debug!("Unzipping rom...");
-        let mut archive = zip::ZipArchive::new(file)?;
+        let mut archive = zip::ZipArchive::new(reader)?;
 
         let filename = archive
             .file_names()
@@ -127,17 +143,34 @@ impl Cartridge {
 #[cfg(feature = "use-test-roms")]
 mod tests {
     use super::*;
+    use std::fs::read;
 
     #[test]
     fn test_read_gb() -> Result<(), Error> {
-        let cartridge = Cartridge::load_from_path("../doctor/roms/demos/cncd-at.zip")?;
+        let cartridge = Cartridge::load_from_path("../doctor/roms/demos/alttoo.gb")?;
         assert_eq!(cartridge.title(), "CNCD ALT'02    �");
         Ok(())
     }
 
     #[test]
     fn test_read_zip() -> Result<(), Error> {
-        let cartridge = Cartridge::load_from_path("../doctor/roms/demos/alttoo.gb")?;
+        let cartridge = Cartridge::load_from_path("../doctor/roms/demos/cncd-at.zip")?;
+        assert_eq!(cartridge.title(), "CNCD ALT'02    �");
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_from_bytes_raw_gb() -> Result<(), Error> {
+        let data = read("../doctor/roms/demos/alttoo.gb")?;
+        let cartridge = Cartridge::load_from_bytes(&data)?;
+        assert_eq!(cartridge.title(), "CNCD ALT'02    �");
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_from_bytes_raw_zip() -> Result<(), Error> {
+        let data = read("../doctor/roms/demos/cncd-at.zip")?;
+        let cartridge = Cartridge::load_from_bytes(&data)?;
         assert_eq!(cartridge.title(), "CNCD ALT'02    �");
         Ok(())
     }

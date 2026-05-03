@@ -30,6 +30,10 @@ impl Machine {
         info!("Loading cartridge: {:?}", path.as_ref());
         self.bus.load_cartridge(path)
     }
+    pub fn load_cartridge_from_bytes(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
+        info!("Loading cartridge from bytes ({} bytes)", data.len());
+        self.bus.load_cartridge_from_bytes(data)
+    }
 
     pub fn frame(&self) -> &[u8] {
         &self.ppu.frame_buffer
