@@ -5,6 +5,7 @@ pub(crate) mod debug;
 pub(crate) mod joypad;
 pub(crate) mod machine;
 pub(crate) mod ppu;
+pub mod serial;
 mod tests;
 mod timer;
 

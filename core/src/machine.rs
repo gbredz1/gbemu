@@ -5,7 +5,7 @@ use crate::debug::breakpoint::BreakpointManager;
 use crate::joypad::Joypad;
 use crate::ppu::Ppu;
 use crate::timer::Timer;
-use crate::{joypad, CYCLES_PER_FRAME};
+use crate::{CYCLES_PER_FRAME, joypad};
 use log::info;
 use std::error::Error;
 use std::path::Path;
@@ -43,6 +43,9 @@ impl Machine {
     }
     pub fn bus(&self) -> &MemorySystem {
         &self.bus
+    }
+    pub fn bus_mut(&mut self) -> &mut MemorySystem {
+        &mut self.bus
     }
     pub fn cartridge(&self) -> &Cartridge {
         self.bus.cartridge()

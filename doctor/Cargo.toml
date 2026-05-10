@@ -21,3 +21,6 @@ name = "gameboy-doctor"
 
 [[bin]]
 name = "sm83-doctor"
+
+[[bin]]
+name = "blargg-doctor"

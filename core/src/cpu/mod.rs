@@ -139,7 +139,7 @@ impl Cpu {
                 self.halted = false;
 
                 if !self.ime {
-                    return 0; // no IME, do not handle interrupt
+                    return 4; // HALT wake-up penalty, but no interrupt taken
                 }
             } else {
                 return 0; // no interruptions, stay halted

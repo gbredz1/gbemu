@@ -81,6 +81,7 @@ macro_rules! define_palette_accessors {
 }
 use crate::cartridge::Cartridge;
 use crate::joypad::joypad_bus::JoypadBus;
+use crate::serial::serial_bus::SerialBus;
 use crate::timer::timer_bus::TimerBus;
 pub(crate) use define_palette_accessors;
 
@@ -270,11 +271,12 @@ impl PpuBus for MemorySystem {}
 impl TimerBus for MemorySystem {}
 impl InterruptBus for MemorySystem {}
 impl JoypadBus for MemorySystem {}
+impl SerialBus for MemorySystem {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::timer::{Timer, DMG_DIV_INITIAL_VALUE};
+    use crate::timer::{DMG_DIV_INITIAL_VALUE, Timer};
 
     #[test]
     fn test_read_write_byte() {
