@@ -59,30 +59,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn simple_serial(bus: &mut MemorySystem, serial_buffer: &mut String) -> bool {
-    let sc = bus.read_byte(0xFF00);
-    if sc & 0b1000_0000 != 0 {
-        let sb = bus.read_byte(0xFF01);
-        bus.write_byte(0xFF01, 0xFF);
+    let sc = bus.read_byte(0xFF02); // Serial Control Register
+    if sc & 0b1000_0000 == 0 {
+        return false; // Serial data isn't ready
+    }
 
-        match sb {
-            0x0A => {
-                debug!("[SERIAL] => {}", serial_buffer.trim());
+    let sb = bus.read_byte(0xFF01); // Serial Data Register
+    bus.write_byte(0xFF01, 0xFF); // Clear Serial Data Register
 
-                match serial_buffer.trim().to_lowercase().as_str() {
-                    "passed" => return true,
-                    s => {
-                        if s.starts_with("failed") {
-                            return true;
-                        }
+    match sb {
+        0x0A => {
+            debug!("[SERIAL] => {}", serial_buffer.trim());
+
+            match serial_buffer.trim().to_lowercase().as_str() {
+                "passed" => return true,
+                s => {
+                    if s.starts_with("failed") {
+                        return true;
                     }
                 }
+            }
 
-                serial_buffer.clear();
-            }
-            0xFF => {}
-            _ => {
-                serial_buffer.push(sb as char);
-            }
+            serial_buffer.clear();
+        }
+        0xFF => {}
+        _ => {
+            serial_buffer.push(sb as char);
         }
     }
     false
