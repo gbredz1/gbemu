@@ -1,5 +1,5 @@
 use crate::app::{App, Message};
-use iced::{Font, Point, Settings, Size, Task, Theme, application, window};
+use iced::{application, window, Font, Point, Settings, Size, Task, Theme};
 
 mod app;
 pub(crate) mod style;
@@ -20,6 +20,8 @@ struct Args {
     use_boot_rom: bool,
     #[arg(long = "run", default_value = "false")]
     auto_run: bool,
+    #[arg(long = "ff")]
+    fast_forward: Option<usize>,
 }
 
 fn main() -> iced::Result {
@@ -34,7 +36,7 @@ fn main() -> iced::Result {
         Err(_) => Font::MONOSPACE,
     };
 
-    application(move ||{
+    application(move || {
         let mut app = App::default();
         if args.use_boot_rom {
             app.machine.use_boot_rom().expect("Failed to load boot rom");
@@ -45,6 +47,10 @@ fn main() -> iced::Result {
             app.machine
                 .load_cartridge(rom_path.as_str())
                 .expect("Failed to load cartridge");
+        }
+
+        if let Some(factor) = args.fast_forward {
+            app.fast_forward = Some(factor);
         }
 
         let task = if args.auto_run {

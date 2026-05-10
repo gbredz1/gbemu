@@ -8,6 +8,7 @@ use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{keyboard, time, window, Element, Subscription, Task};
 use iced_core::keyboard::{Event, Key};
+use iced_widget::Button;
 use log::error;
 use std::time::Instant;
 
@@ -19,6 +20,7 @@ const CONTENT_PADDING: f32 = 10.0;
 
 pub(crate) struct App {
     pub machine: Machine,
+    pub fast_forward: Option<usize>,
     last_update: Option<Instant>,
     is_running: bool,
     breakpoint_at: String,
@@ -35,6 +37,7 @@ pub enum Message {
     Step,
     StepFrame,
     Reset,
+    FastForward(Option<usize>),
 
     // User interface
     CloseWindow,
@@ -64,6 +67,7 @@ impl Default for App {
             view_memory_state: view_memory::State::default(),
             screen: Screen::default(),
             total_cycles: 0,
+            fast_forward: None,
         }
     }
 }
@@ -75,7 +79,11 @@ impl App {
     pub fn subscription(&self) -> Subscription<Message> {
         let mut subscriptions = vec![];
         if self.is_running {
-            subscriptions.push(time::every(FRAME_DURATION).map(Message::Tick));
+            let a = match self.fast_forward {
+                None => FRAME_DURATION,
+                Some(a) => FRAME_DURATION / a as u32,
+            };
+            subscriptions.push(time::every(a).map(Message::Tick));
         };
 
         subscriptions.push(keyboard::listen().filter_map(|event| {
@@ -137,6 +145,7 @@ impl App {
             Message::Step => self.do_step(),
             Message::StepFrame => self.do_step_frame(),
             Message::Reset => self.do_reset(),
+            Message::FastForward(factor) => self.fast_forward(factor),
 
             // User interface
             Message::CloseWindow => window::latest().and_then(window::close),
@@ -270,6 +279,11 @@ impl App {
         self.breakpoint_at = content;
         Task::none()
     }
+
+    fn fast_forward(&mut self, factor: Option<usize>) -> Task<Message> {
+        self.fast_forward = factor;
+        Task::none()
+    }
 }
 
 fn view_control_panel<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
@@ -286,11 +300,13 @@ fn view_control_panel<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
         .on_press(Message::StepFrame)
         .style(button::secondary);
 
-    let total_cycles = column![text("cycles:").size(12), text(app.total_cycles).size(12),].align_x(Horizontal::Center);
+    let total_cycles = column![text("cycles:").size(10), text(app.total_cycles).size(10),].align_x(Horizontal::Center);
 
     let breakpoint_controls = view_breakpoint_controls(app);
 
     let load_rom = button("Load ROM").style(button::secondary).on_press(Message::OpenFile);
+
+    let fast_forward_controls = view_fast_forward_controls(app);
 
     row![
         run_button,
@@ -299,6 +315,7 @@ fn view_control_panel<'a>(is_running: bool, app: &App) -> Element<'a, Message> {
         reset_button,
         breakpoint_controls,
         load_rom,
+        fast_forward_controls,
         total_cycles,
     ]
     .spacing(BUTTON_SPACING)
@@ -330,4 +347,25 @@ fn view_breakpoint_controls<'a>(app: &App) -> iced::widget::Row<'a, Message> {
             .style(button::secondary),
     ]
     .align_y(Vertical::Center)
+}
+
+fn view_fast_forward_controls<'a>(app: &App) -> Button<'a, Message> {
+    let factor = match app.fast_forward {
+        None => Some(2),
+        Some(2) => Some(4),
+        Some(4) => Some(8),
+        Some(8) => Some(16),
+        Some(16) => Some(32),
+        Some(_) => None,
+    };
+
+    let label = match app.fast_forward {
+        None => "x1".to_string(),
+        Some(a) => format!("x{}", a),
+    };
+
+    button(text(label).align_x(Horizontal::Center))
+        .width(34)
+        .style(button::secondary)
+        .on_press(Message::FastForward(factor))
 }

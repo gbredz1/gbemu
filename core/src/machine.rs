@@ -57,13 +57,14 @@ impl Machine {
     }
 
     pub fn step_frame(&mut self) -> Result<(usize, bool), Box<dyn Error>> {
+        let breakpoint_empty = self.breakpoint_manager().len() == 0;
         let mut total_cycles: usize = 0;
         let mut breakpoint_hit = false;
 
         while total_cycles < CYCLES_PER_FRAME {
             total_cycles += self.step()? as usize;
 
-            if self.breakpoint_manager.has_breakpoint(self.cpu.pc()) {
+            if !breakpoint_empty && self.breakpoint_manager.has_breakpoint(self.cpu.pc()) {
                 breakpoint_hit = true;
                 break;
             }
